@@ -1,0 +1,899 @@
+/*
+ * Lumina design tokens
+ * —— 一套 "tech glass" 设计语言 ——
+ * 原则：
+ *   字体配对  Sora(显示) + Inter(正文)，各司其职
+ *   锚点色    单个 aqua 电光蓝，视觉抓点不超过 5%
+ *   间距      4px 命名刻度，禁止任意 padding
+ *   动效      exponential ease-out，尊重 prefers-reduced-motion
+ *   布局      制造不对称，杜绝全居中
+ */
+
+/* ============ 字体 ============ */
+@font-face {
+  font-family: 'Sora Variable';
+  src: local('Sora Variable');
+  font-weight: 100 800;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Inter Variable';
+  src: local('Inter Variable');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  /* 字体角色 */
+  --font-display: 'Sora Variable', 'Inter Variable', -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  --font-body: 'Inter Variable', -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+
+  /* 字号阶梯 */
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-md: 13px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 22px;
+  --text-3xl: 28px;
+  --text-4xl: 36px;
+
+  /* 4px 间距刻度 */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 32px;
+  --sp-8: 40px;
+  --sp-9: 48px;
+  --sp-10: 64px;
+
+  /* 圆角 */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-pill: 999px;
+
+  /* 动效 */
+  --ease-out: cubic-bezier(0.19, 1, 0.22, 1);
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 360ms;
+
+  /* 锚点色（亮色） */
+  --accent: #2693ff;
+  --accent-strong: #0b5cd6;
+  --accent-soft: rgba(38, 147, 255, 0.1);
+}
+
+/* ================= 浅色（默认） ================= */
+body {
+  --bg-app: #f2f5f9;
+  --bg-raised: #ffffff;
+  --bg-subtle: #e8edf4;
+
+  /* 玻璃 */
+  --glass-bg: rgba(255, 255, 255, 0.66);
+  --glass-border: rgba(23, 43, 77, 0.1);
+  --glass-hi: rgba(255, 255, 255, 0.9);
+  --glass-blur: saturate(160%) blur(18px);
+
+  /* 文本 */
+  --text-1: #182230;
+  --text-2: #4a5a6e;
+  --text-3: #8a99ad;
+  --text-inverse: rgba(255, 255, 255, 0.92);
+
+  --border-1: rgba(23, 43, 77, 0.1);
+  --border-2: rgba(23, 43, 77, 0.15);
+
+  /* 语义色 */
+  --success: #18a058;
+  --warning: #d97706;
+  --danger: #e5484d;
+  --info: #2693ff;
+
+  --shadow-1: 0 1px 2px rgba(23, 43, 77, 0.06);
+  --shadow-2: 0 4px 16px rgba(23, 43, 77, 0.08);
+  --shadow-3: 0 12px 40px rgba(23, 43, 77, 0.14);
+  --glow: 0 0 0 1px var(--glass-border), 0 8px 32px rgba(38, 147, 255, 0.14);
+
+  --scrollbar-bg: transparent;
+  --scrollbar-thumb: rgba(23, 43, 77, 0.18);
+
+  background: var(--bg-app);
+  color: var(--text-1);
+}
+
+/* ================= 深色（tech glass 主场） ================= */
+body[arco-theme='dark'] {
+  --bg-app: #070a12;
+  --bg-raised: #0d1220;
+  --bg-subtle: #0f1526;
+
+  --glass-bg: rgba(20, 28, 48, 0.55);
+  --glass-border: rgba(148, 184, 255, 0.12);
+  --glass-hi: rgba(255, 255, 255, 0.06);
+  --glass-blur: saturate(160%) blur(18px);
+
+  --text-1: #e8eefc;
+  --text-2: #9fb0c9;
+  --text-3: #5d6c84;
+  --text-inverse: rgba(9, 13, 24, 0.92);
+
+  --border-1: rgba(148, 184, 255, 0.1);
+  --border-2: rgba(148, 184, 255, 0.18);
+
+  --success: #3ddc90;
+  --warning: #f5a524;
+  --danger: #ff5c6c;
+  --info: #3aa4ff;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 8px 28px rgba(0, 0, 0, 0.5);
+  --shadow-3: 0 24px 64px rgba(0, 0, 0, 0.6);
+  --glow: 0 0 0 1px var(--glass-border), 0 8px 40px rgba(58, 164, 255, 0.16);
+
+  --scrollbar-bg: transparent;
+  --scrollbar-thumb: rgba(148, 184, 255, 0.2);
+
+  --accent: #4cb4ff;
+  --accent-strong: #7cc6ff;
+  --accent-soft: rgba(76, 180, 255, 0.14);
+
+  background: var(--bg-app);
+  color: var(--text-1);
+}
+
+/* ================= 基础 ================= */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background-color var(--dur-3) var(--ease-out), color var(--dur-3) var(--ease-out);
+}
+
+h1, h2, h3, .display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+/* 滚动条 */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-bg);
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: var(--radius-pill);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--border-2);
+  background-clip: content-box;
+  border: 3px solid transparent;
+}
+
+/* ================= 玻璃面板 ================= */
+.glass {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+  transition: background-color var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out);
+}
+.glass-hover:hover {
+  border-color: var(--border-2);
+  box-shadow: var(--shadow-2);
+}
+
+/* ================= Pill ================= */
+.lumina-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1;
+  padding: 3px 8px;
+  border: 1px solid;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  cursor: default;
+}
+
+/* ================= 侧栏 ================= */
+.lumina-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: all var(--dur-1) var(--ease-out);
+  text-align: left;
+}
+.lumina-nav:hover {
+  background: var(--glass-hi);
+}
+
+.lumina-side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px;
+}
+.lumina-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--dur-1) var(--ease-out);
+}
+.lumina-iconbtn:hover {
+  background: var(--glass-hi);
+  color: var(--text-1);
+}
+
+.lumina-tag {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 5px 8px;
+  margin-bottom: 2px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--dur-1) var(--ease-out);
+}
+.lumina-tag:hover .lumina-chev {
+  color: var(--text-2);
+}
+.lumina-chev {
+  color: var(--text-3);
+  flex-shrink: 0;
+  display: inline-flex;
+}
+.lumina-tag-hash {
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+.lumina-tag-count {
+  font-size: var(--text-xs);
+  color: var(--text-3);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.lumina-archive {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-md);
+  color: var(--text-3);
+  font-size: var(--text-md);
+  cursor: pointer;
+  transition: all var(--dur-1) var(--ease-out);
+}
+.lumina-archive:hover {
+  background: var(--glass-hi);
+  color: var(--text-2);
+}
+
+.lumina-ctxitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: var(--text-md);
+  transition: background var(--dur-1) var(--ease-out);
+}
+.lumina-ctxitem:hover {
+  background: var(--accent-soft);
+}
+
+/* ================= 按钮 ================= */
+.lumina-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-body);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  transition: all var(--dur-1) var(--ease-out);
+  outline: none;
+}
+.lumina-btn.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.lumina-btn:focus-visible {
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.lumina-btn-primary {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 1px 10px var(--accent-soft);
+}
+.lumina-btn-primary:hover:not(.is-disabled) {
+  background: var(--accent-strong);
+}
+
+.lumina-btn-danger {
+  background: var(--danger);
+  color: #fff;
+}
+.lumina-btn-danger:hover:not(.is-disabled) {
+  opacity: 0.9;
+}
+
+.lumina-btn-outline {
+  background: transparent;
+  color: var(--text-1);
+  border-color: var(--border-2);
+}
+.lumina-btn-outline:hover:not(.is-disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.lumina-btn-subtle {
+  background: var(--glass-bg);
+  color: var(--text-2);
+  border-color: var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+}
+.lumina-btn-subtle:hover:not(.is-disabled) {
+  background: var(--glass-hi);
+  color: var(--text-1);
+}
+
+.lumina-btn-ghost {
+  background: transparent;
+  color: var(--text-2);
+}
+.lumina-btn-ghost:hover:not(.is-disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* ================= 编辑器 ================= */
+.lumina-toolbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all var(--dur-1) var(--ease-out);
+}
+.lumina-toolbtn:hover {
+  border-color: var(--border-2);
+  background: var(--glass-hi);
+}
+.lumina-toolbtn-primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: #fff;
+}
+.lumina-tool {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  transition: all var(--dur-1) var(--ease-out);
+}
+.lumina-tool:hover {
+  background: var(--glass-hi);
+}
+
+.lumina-editor-title {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-1);
+  margin-bottom: var(--sp-4);
+}
+.lumina-editor-title::placeholder {
+  color: var(--text-3);
+}
+
+.lumina-editor-prosemirror {
+  min-height: 300px;
+  outline: none;
+  line-height: 1.8;
+  font-size: var(--text-lg);
+  color: var(--text-1);
+  font-family: var(--font-body);
+}
+.lumina-editor-prosemirror p {
+  margin: 0 0 10px;
+}
+.lumina-editor-prosemirror h1 {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  margin: 20px 0 10px;
+  letter-spacing: -0.02em;
+}
+.lumina-editor-prosemirror h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  margin: 18px 0 10px;
+}
+.lumina-editor-prosemirror ul,
+.lumina-editor-prosemirror ol {
+  padding-left: 24px;
+  margin: 0 0 10px;
+}
+.lumina-editor-prosemirror blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: var(--sp-4);
+  margin: 12px 0;
+  color: var(--text-2);
+  font-style: italic;
+}
+.lumina-editor-prosemirror pre {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-1);
+  padding: var(--sp-4);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  font-size: var(--text-md);
+}
+.lumina-editor-prosemirror code {
+  background: var(--bg-subtle);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.92em;
+}
+.lumina-editor-prosemirror a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px dashed var(--accent);
+}
+.lumina-editor-prosemirror a:hover {
+  text-decoration: underline;
+}
+.lumina-editor-prosemirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--text-3);
+  pointer-events: none;
+  height: 0;
+}
+
+/* 双链选择器 */
+.lumina-note-linker {
+  position: fixed;
+  z-index: 2000;
+  min-width: 220px;
+  background: var(--color-bg-popup);
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-3);
+  overflow: hidden;
+  font-size: var(--text-md);
+}
+.lumina-note-linker .li-header {
+  padding: 6px 12px;
+  font-size: var(--text-xs);
+  color: var(--text-3);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--color-border-1);
+}
+.lumina-note-linker .li-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lumina-note-linker .li-item.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.lumina-note-linker .li-empty {
+  padding: 8px 12px;
+  color: var(--text-3);
+}
+
+/* ================= 搜索 ================= */
+.lumina-ai-hist {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease-out);
+}
+.lumina-ai-hist:hover {
+  background: var(--glass-hi);
+}
+.lumina-ai-hist-ic {
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+.lumina-ai-card {
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: transform var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
+}
+.lumina-ai-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-2);
+}
+
+.lumina-side-link {
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--text-md);
+  color: var(--text-2);
+  margin-bottom: 4px;
+  transition: all var(--dur-1) var(--ease-out);
+}
+.lumina-side-link:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.lumina-note-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  box-shadow: 0 0 8px var(--accent-soft);
+  flex-shrink: 0;
+}
+
+.lumina-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-family: var(--font-body);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--dur-1) var(--ease-out);
+}
+.lumina-filter:hover {
+  background: var(--glass-hi);
+}
+
+.lumina-feed-item {
+  display: flex;
+  gap: 14px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--glass-border);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease-out);
+}
+.lumina-feed-item:last-child {
+  border-bottom: none;
+}
+.lumina-feed-item:hover {
+  background: var(--accent-soft);
+}
+.lumina-feed-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.lumina-tagchip {
+  font-size: var(--text-xs);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+}
+.lumina-feed-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+.lumina-feed-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+.lumina-feed-link:hover {
+  text-decoration: underline;
+}
+.lumina-feed-dive {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--text-xs);
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all var(--dur-1) var(--ease-out);
+}
+.lumina-feed-dive:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.lumina-quad {
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  background: var(--bg-subtle);
+  transition: border-color var(--dur-1) var(--ease-out);
+}
+.lumina-quad:hover {
+  border-color: var(--border-2);
+}
+
+.lumina-inspire {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-1);
+  background: var(--bg-subtle);
+  padding: 12px;
+  cursor: pointer;
+  transition: all var(--dur-2) var(--ease-out);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.lumina-inspire:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-2);
+}
+.lumina-inspire-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.lumina-inspire-arrow {
+  color: var(--text-3);
+  flex-shrink: 0;
+  opacity: 0;
+  transition: all var(--dur-1) var(--ease-out);
+}
+.lumina-inspire:hover .lumina-inspire-arrow {
+  opacity: 1;
+  color: var(--accent);
+}
+
+.lumina-heat {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: transform var(--dur-1) var(--ease-out);
+}
+.lumina-heat:hover {
+  transform: scale(1.2);
+}
+
+.lumina-quote-mark {
+  opacity: 0.7;
+}
+
+/* ================= 看板 Widget ================= */
+.lumina-board-widget {
+  transition: background-color var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out);
+}
+.lumina-board-widget:hover {
+  border-color: var(--border-2);
+  box-shadow: var(--shadow-2);
+}
+
+.lumina-board-input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text-1);
+  font-family: var(--font-body);
+  font-size: var(--text-md);
+  padding: 6px 10px;
+  outline: none;
+  transition: border-color var(--dur-1) var(--ease-out);
+}
+.lumina-board-input:focus {
+  border-color: var(--accent);
+}
+
+.lumina-board-todo .lumina-board-del,
+.lumina-board-link .lumina-board-del {
+  opacity: 0;
+  transition: opacity var(--dur-1) var(--ease-out);
+}
+.lumina-board-todo:hover .lumina-board-del,
+.lumina-board-link:hover .lumina-board-del {
+  opacity: 1;
+}
+.lumina-board-link:hover {
+  background: var(--accent-soft);
+}
+
+.lumina-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-lg);
+}
+.lumina-search-icon {
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+.lumina-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  color: var(--text-1);
+}
+.lumina-search-input::placeholder {
+  color: var(--text-3);
+}
+.lumina-search-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.lumina-suggest {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 100;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-3);
+  overflow: hidden;
+  padding: 4px;
+}
+@keyframes lumina-suggest-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.lumina-suggest {
+  animation: lumina-suggest-in var(--dur-2) var(--ease-out);
+}
+.lumina-suggest-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--text-md);
+}
+
+/* ================= 文本角色 ================= */
+.lumina-pick-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all var(--dur-1) var(--ease-out);
+  font-size: var(--text-base);
+}
+.lumina-pick-item:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.lumina-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.lumina-display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* ================= 动效默认值 ================= */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

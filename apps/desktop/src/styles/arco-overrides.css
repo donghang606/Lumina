@@ -1,0 +1,171 @@
+/*
+ * Arco Design 变量融合
+ * 把 Arco 的语义色板映射到 Lumina design tokens，
+ * 使保留下来的 Arco 组件（Input / Modal / Table / Select / Switch / Tabs / Form）
+ * 与自定义玻璃界面无缝融合。
+ */
+
+/* ============ 浅色 ============ */
+body {
+  --color-bg-1: #f2f5f9;
+  --color-bg-2: #ffffff;
+  --color-bg-3: #f7f9fc;
+  --color-bg-4: #ffffff;
+  --color-bg-5: #ffffff;
+  --color-bg-white: #ffffff;
+  --color-bg-popup: #ffffff;
+
+  --color-fill-1: rgba(23, 43, 77, 0.05);
+  --color-fill-2: rgba(23, 43, 77, 0.09);
+  --color-fill-3: rgba(23, 43, 77, 0.14);
+  --color-fill-4: rgba(23, 43, 77, 0.2);
+
+  --color-text-1: #182230;
+  --color-text-2: #4a5a6e;
+  --color-text-3: #8a99ad;
+  --color-text-4: #aab6c6;
+
+  --color-border: var(--border-1);
+  --color-border-1: var(--border-1);
+  --color-border-2: var(--border-2);
+  --color-border-3: rgba(23, 43, 77, 0.22);
+  --color-border-4: rgba(23, 43, 77, 0.3);
+
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  --primary-1: rgba(38, 147, 255, 0.09);
+  --primary-2: rgba(38, 147, 255, 0.16);
+  --primary-3: rgba(38, 147, 255, 0.28);
+  --primary-4: rgba(38, 147, 255, 0.5);
+  --primary-5: rgba(38, 147, 255, 0.78);
+  --primary-6: #2693ff;
+  --primary-7: #1a7be8;
+  --primary-8: #1064c8;
+  --primary-9: #0b4ea3;
+  --primary-10: #093e86;
+}
+
+/* ============ 深色 ============ */
+body[arco-theme='dark'] {
+  --color-bg-1: #070a12;
+  --color-bg-2: #0d1220;
+  --color-bg-3: #111828;
+  --color-bg-4: #ffffff;
+  --color-bg-5: #ffffff;
+  --color-bg-white: #0d1220;
+  --color-bg-popup: #141b2e;
+
+  --color-fill-1: rgba(148, 184, 255, 0.06);
+  --color-fill-2: rgba(148, 184, 255, 0.1);
+  --color-fill-3: rgba(148, 184, 255, 0.16);
+  --color-fill-4: rgba(148, 184, 255, 0.22);
+
+  --color-text-1: #e8eefc;
+  --color-text-2: #9fb0c9;
+  --color-text-3: #5d6c84;
+  --color-text-4: #46536a;
+
+  --color-border: rgba(148, 184, 255, 0.1);
+  --color-border-1: rgba(148, 184, 255, 0.1);
+  --color-border-2: rgba(148, 184, 255, 0.18);
+  --color-border-3: rgba(148, 184, 255, 0.28);
+  --color-border-4: rgba(148, 184, 255, 0.38);
+
+  --color-white: rgba(255, 255, 255, 0.9);
+  --color-black: #000000;
+
+  --primary-1: rgba(76, 180, 255, 0.12);
+  --primary-2: rgba(76, 180, 255, 0.24);
+  --primary-3: rgba(76, 180, 255, 0.4);
+  --primary-4: rgba(76, 180, 255, 0.6);
+  --primary-5: rgba(76, 180, 255, 0.8);
+  --primary-6: #4cb4ff;
+  --primary-7: #61befa;
+  --primary-8: #79cdea;
+  --primary-9: #94d9f0;
+  --primary-10: #b0e2f0;
+
+  --red-6: 255, 92, 108;
+  --orangered-6: 255, 122, 51;
+  --gold-6: 245, 165, 36;
+  --green-6: 61, 220, 144;
+  --arcoblue-6: 76, 180, 255;
+}
+
+/* ============ 组件精细化 ============ */
+
+/* 输入框：玻璃面板化 */
+.arco-input,
+.arco-textarea,
+.arco-input-group-addbefore,
+.arco-input-search-button {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border-color: var(--glass-border);
+  transition: all var(--dur-2) var(--ease-out);
+}
+.arco-input:hover,
+.arco-textarea:hover {
+  border-color: var(--border-2);
+}
+.arco-input:focus,
+.arco-input-focus,
+.arco-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* 弹层 / 菜单：不透明深面，避免叠玻璃变形 */
+.arco-modal,
+.arco-popover,
+.arco-tooltip-content,
+.arco-dropdown-menu,
+.arco-select-popup,
+.arco-message {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.arco-modal {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--glass-border);
+}
+.arco-modal-header {
+  border-bottom: 1px solid var(--glass-border);
+}
+
+/* 表格：减少胶水 */
+.arco-table-th {
+  background: var(--bg-subtle) !important;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.arco-table-tr:hover td {
+  background: var(--accent-soft) !important;
+}
+
+/* 开关 */
+.arco-switch {
+  border-radius: var(--radius-pill);
+}
+
+/* 标签页 */
+.arco-tabs-header-title {
+  border-radius: var(--radius-md);
+}
+.arco-tabs-header-title-active {
+  background: var(--accent-soft);
+}
+
+/* 按钮：统一微调圆角与字号（自定义按钮路径不经过这里） */
+.arco-btn {
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  transition: all var(--dur-1) var(--ease-out)!important;
+  border-color: var(--border-2);
+}
+.arco-btn-primary {
+  box-shadow: var(--shadow-1);
+}

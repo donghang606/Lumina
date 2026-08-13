@@ -1,0 +1,50 @@
+# ---- Node ----
+node_modules/
+.pnpm-store/
+*.tsbuildinfo
+
+# ---- Build outputs ----
+dist/
+build/
+out/
+*.local
+
+# ---- Tauri / Rust ----
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+
+# ---- Server ----
+apps/server/data/
+apps/server/*.db
+apps/server/*.db-journal
+apps/server/*.db-wal
+apps/server/*.db-shm
+apps/server/embeddings/
+
+# ---- Extension ----
+apps/extension/.wxt/
+apps/extension/extension-key.pem
+apps/extension/stats.json
+
+# ---- Env / secrets ----
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+!extension-key.pem.dummy
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# ---- Logs ----
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# ---- Obsidian vault (local companion docs) ----
+Obsidian\ Vault/

@@ -1,0 +1,1 @@
+{"manifest_version":3,"name":"Lumina 收藏","description":"一键收藏网页到 Lumina 个人知识库","version":"0.1.0","permissions":["activeTab","storage"],"host_permissions":["http://localhost:3001/*"],"action":{"default_title":"Lumina 收藏","default_popup":"popup.html"},"content_scripts":[{"matches":["<all_urls>"],"run_at":"document_idle","js":["content-scripts/content.js"]}]}

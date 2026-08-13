@@ -1,0 +1,107 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  # ---------- 桌面客户端：三平台安装包 ----------
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin
+            bundle: '*.dmg *".app"'
+          - platform: macos-latest
+            args: --target x86_64-apple-darwin
+          - platform: ubuntu-22.04
+            args: ''
+          - platform: windows-latest
+            args: ''
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Linux system deps
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend + server
+        run: |
+          pnpm -r build
+          pnpm --filter @lumina/desktop build
+
+      - name: Build Tauri bundle
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Lumina ${{ github.ref_name }}'
+          releaseBody: '查看安装说明：README(安装方式选择)。桌面安装包见下方 Assets；Web 端产物见同 Tag 的 lumina-web-* 附件。'
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
+
+  # ---------- Web 端：前端静态产物 + 服务端 ----------
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web assets
+        run: |
+          pnpm -r build
+          pnpm --filter @lumina/desktop build
+
+      - name: Stage artifacts
+        run: |
+          mkdir -p lumina-web/apps/desktop
+          cp -r apps/desktop/dist lumina-web/apps/desktop/dist 2>/dev/null || true
+          cp -r apps/server lumina-web/apps/server
+          echo 'Lumina Web 版（前端静态产物 + 服务端源码）' > lumina-web/README.txt
+          echo '部署步骤见仓库 docs/QUICK-START.md（Web 端自部署）' >> lumina-web/README.txt
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: lumina-web/**
+          draft: true

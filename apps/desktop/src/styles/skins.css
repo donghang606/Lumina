@@ -1,0 +1,691 @@
+/*
+ * Lumina skins
+ * —— 皮肤是 tokens 之上的覆盖层，由 body[data-skin] 驱动 ——
+ * 每款皮肤显式覆盖语义变量，与 arco-theme（由 useTheme 按皮肤自带模式设置）解耦。
+ * 优先级：skins.css 在 tokens.css 之后引入，body[data-skin] 特异性高于 body。
+ */
+
+/* ================================================================
+   Skin 1 · Nothing（极简工业）
+   按 nothing-design-skill 规范完整实现：
+   - 双模式：亮（纸上印刷手册）/ 暗（OLED 仪器面板），跟随主题切换
+   - 字体：Space Grotesk(标题/正文) + Space Mono(标签/数据/输入) + Doto(大数字)
+   - 扁平表面、1px 边框分层、无阴影无模糊、小圆角技术感
+   - 点阵背景、[ 导航 ] 括号、等宽大写标签
+   ================================================================ */
+
+/* —— 共享：字体角色 / 圆角 / 阴影 / 模糊 —— */
+body[data-skin='nothing'] {
+  --font-display: 'Space Grotesk Variable', 'Space Mono', 'PingFang SC', monospace;
+  --font-body: 'Space Grotesk Variable', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  --font-mono: 'Space Mono', 'SF Mono', 'Menlo', 'Consolas', 'PingFang SC', monospace;
+  --font-doto: 'Doto Variable', 'Space Mono', monospace;
+
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+
+  --glass-blur: none;
+  --shadow-1: none;
+  --shadow-2: none;
+  --shadow-3: none;
+}
+
+/* —— 亮色：纸上印刷手册 —— */
+body[data-skin='nothing'] {
+  --bg-app: #f2f2f0;
+  --bg-raised: #ffffff;
+  --bg-subtle: #e8e8e5;
+
+  --glass-bg: #ffffff;
+  --glass-border: #d3d3ce;
+  --glass-hi: #ececea;
+
+  --text-1: #161616;
+  --text-2: #555553;
+  --text-3: #8f8f8b;
+  --text-inverse: #ffffff;
+
+  --border-1: #ddddd9;
+  --border-2: #b7b7b2;
+
+  --accent: #d71921;
+  --accent-strong: #a40d26;
+  --accent-soft: rgba(215, 25, 33, 0.08);
+
+  --success: #1f7a3d;
+  --warning: #9a6a00;
+  --danger: #d71921;
+  --info: #555553;
+
+  --glow: 0 0 0 1px #b7b7b2;
+
+  --scrollbar-bg: transparent;
+  --scrollbar-thumb: #c9c9c4;
+
+  --color-bg-popup: #ffffff;
+  --primary-1: rgba(215, 25, 33, 0.08);
+  --primary-2: rgba(215, 25, 33, 0.14);
+  --primary-3: rgba(215, 25, 33, 0.24);
+  --primary-4: rgba(215, 25, 33, 0.45);
+  --primary-5: rgba(215, 25, 33, 0.72);
+  --primary-6: #d71921;
+  --primary-7: #a40d26;
+  --primary-8: #8a0a1f;
+  --primary-9: #6e0818;
+  --primary-10: #5c0613;
+
+  background-color: var(--bg-app);
+  background-image: radial-gradient(circle, rgba(0, 0, 0, 0.085) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+/* —— 暗色：OLED 仪器面板 —— */
+body[data-skin='nothing'][arco-theme='dark'] {
+  --bg-app: #000000;
+  --bg-raised: #111111;
+  --bg-subtle: #1a1a1a;
+
+  --glass-bg: #111111;
+  --glass-border: #2a2a2a;
+  --glass-hi: #1a1a1a;
+
+  --text-1: #e8e8e8;
+  --text-2: #999999;
+  --text-3: #666666;
+  --text-inverse: #000000;
+
+  --border-1: #222222;
+  --border-2: #333333;
+
+  --accent: #d71921;
+  --accent-strong: #ff2b33;
+  --accent-soft: rgba(215, 25, 33, 0.14);
+
+  --success: #3f9e54;
+  --warning: #d4a843;
+  --danger: #d71921;
+  --info: #999999;
+
+  --glow: 0 0 0 1px #333333;
+
+  --scrollbar-bg: transparent;
+  --scrollbar-thumb: #333333;
+
+  --color-bg-popup: #111111;
+  --color-fill-1: rgba(255, 255, 255, 0.05);
+  --color-fill-2: rgba(255, 255, 255, 0.08);
+  --color-fill-3: rgba(255, 255, 255, 0.12);
+  --color-fill-4: rgba(255, 255, 255, 0.18);
+  --primary-1: rgba(215, 25, 33, 0.12);
+  --primary-2: rgba(215, 25, 33, 0.2);
+  --primary-3: rgba(215, 25, 33, 0.34);
+  --primary-4: rgba(215, 25, 33, 0.58);
+  --primary-5: rgba(215, 25, 33, 0.82);
+  --primary-6: #d71921;
+  --primary-7: #ff2b33;
+  --primary-8: #ff4d55;
+  --primary-9: #ff6b72;
+  --primary-10: #ff8a90;
+
+  background-color: var(--bg-app);
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+/* —— 文字角色：标签 / 数据 / 输入 用 Space Mono —— */
+body[data-skin='nothing'] .lumina-label {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  letter-spacing: 0.1em;
+}
+
+body[data-skin='nothing'] .lumina-tag-count,
+body[data-skin='nothing'] .lumina-feed-meta,
+body[data-skin='nothing'] .lumina-ai-hist,
+body[data-skin='nothing'] .lumina-search-input,
+body[data-skin='nothing'] .lumina-board-input,
+body[data-skin='nothing'] .arco-input,
+body[data-skin='nothing'] .arco-textarea,
+body[data-skin='nothing'] .arco-table-th {
+  font-family: var(--font-mono);
+}
+
+/* —— 表面：去模糊去阴影 —— */
+body[data-skin='nothing'] .glass,
+body[data-skin='nothing'] .lumina-btn-subtle,
+body[data-skin='nothing'] .lumina-suggest,
+body[data-skin='nothing'] .lumina-note-linker {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+body[data-skin='nothing'] .glass,
+body[data-skin='nothing'] .lumina-board-widget {
+  box-shadow: none;
+}
+
+body[data-skin='nothing'] .lumina-board-widget:hover,
+body[data-skin='nothing'] .lumina-quad:hover,
+body[data-skin='nothing'] .glass-hover:hover,
+body[data-skin='nothing'] .lumina-ai-card:hover {
+  box-shadow: none;
+  border-color: var(--border-2);
+}
+
+body[data-skin='nothing'] .lumina-inspire:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: var(--border-2);
+  background: var(--bg-subtle);
+}
+
+body[data-skin='nothing'] .lumina-ai-card:hover {
+  transform: none;
+}
+
+/* —— 交互 hover：克制的中性底，不用红色填充 —— */
+body[data-skin='nothing'] .lumina-feed-item:hover {
+  background: var(--bg-subtle);
+}
+
+body[data-skin='nothing'] .lumina-pick-item:hover {
+  border-color: var(--text-1);
+  background: transparent;
+}
+
+body[data-skin='nothing'] .lumina-ctxitem:hover,
+body[data-skin='nothing'] .lumina-suggest-item:hover {
+  background: var(--bg-subtle);
+}
+
+/* —— 按钮：等宽大写 pill、扁平无阴影 —— */
+body[data-skin='nothing'] .lumina-btn {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  box-shadow: none !important;
+}
+
+body[data-skin='nothing'] .lumina-btn-primary {
+  background: #111111;
+  color: #ffffff;
+  border-color: transparent;
+}
+body[data-skin='nothing'] .lumina-btn-primary:hover:not(.is-disabled) {
+  background: #000000;
+}
+body[data-skin='nothing'][arco-theme='dark'] .lumina-btn-primary {
+  background: #ffffff;
+  color: #000000;
+}
+body[data-skin='nothing'][arco-theme='dark'] .lumina-btn-primary:hover:not(.is-disabled) {
+  background: #cccccc;
+}
+
+body[data-skin='nothing'] .lumina-btn-outline {
+  background: transparent;
+  color: var(--text-1);
+  border-color: var(--border-2);
+}
+body[data-skin='nothing'] .lumina-btn-outline:hover:not(.is-disabled) {
+  border-color: var(--text-1);
+  color: var(--text-1);
+}
+
+body[data-skin='nothing'] .lumina-btn-subtle {
+  background: var(--bg-raised);
+  color: var(--text-2);
+  border-color: var(--border-2);
+}
+body[data-skin='nothing'] .lumina-btn-subtle:hover:not(.is-disabled) {
+  background: var(--bg-subtle);
+  color: var(--text-1);
+}
+
+body[data-skin='nothing'] .lumina-btn-ghost {
+  background: transparent;
+  color: var(--text-2);
+}
+body[data-skin='nothing'] .lumina-btn-ghost:hover:not(.is-disabled) {
+  background: var(--bg-subtle);
+  color: var(--text-1);
+}
+
+body[data-skin='nothing'] .lumina-btn-danger {
+  background: transparent;
+  color: var(--danger);
+  border-color: var(--danger);
+}
+body[data-skin='nothing'] .lumina-btn-danger:hover:not(.is-disabled) {
+  background: var(--accent-soft);
+}
+
+body[data-skin='nothing'] .lumina-btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent) !important;
+}
+
+/* —— 侧栏导航：等宽大写 + [ 激活 ] 括号 —— */
+body[data-skin='nothing'] .lumina-nav {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 12px;
+  border-radius: 4px;
+}
+
+body[data-skin='nothing'] .lumina-nav.is-active {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: var(--text-1) !important;
+}
+
+body[data-skin='nothing'] .lumina-nav.is-active::before {
+  content: '[ ';
+  color: var(--text-3);
+}
+body[data-skin='nothing'] .lumina-nav.is-active::after {
+  content: ' ]';
+  color: var(--text-3);
+}
+
+/* —— 筛选 / 标签 chip：等宽大写 —— */
+body[data-skin='nothing'] .lumina-filter {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+body[data-skin='nothing'] .lumina-tagchip {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-radius: 4px;
+}
+
+/* —— 数据可视化：机械感 —— */
+body[data-skin='nothing'] .lumina-heat {
+  border-radius: 1px;
+}
+
+/* —— Arco 组件：仪器面板化 —— */
+body[data-skin='nothing'] .arco-modal {
+  box-shadow: none;
+  border-radius: var(--radius-lg);
+  border-color: var(--border-2);
+}
+
+body[data-skin='nothing'] .arco-switch-checked {
+  background-color: var(--text-1) !important;
+}
+body[data-skin='nothing'] .arco-switch-checked .arco-switch-dot {
+  background-color: var(--text-inverse) !important;
+}
+
+body[data-skin='nothing'] .arco-table-th {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ================================================================
+   Skin 2 · Bloomberg（终端 + ascii）
+   黑底琥珀、全等宽字体、大写标签、密度优先的干净终端风。
+   ================================================================ */
+body[data-skin='bloomberg'] {
+  --font-display: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
+  --font-body: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', 'PingFang SC', monospace;
+  --font-mono: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', 'PingFang SC', monospace;
+
+  --bg-app: #0b0e12;
+  --bg-raised: #12161d;
+  --bg-subtle: #171c26;
+
+  --glass-bg: rgba(18, 22, 29, 0.92);
+  --glass-border: #263040;
+  --glass-hi: #1d2430;
+  --glass-blur: none;
+
+  --text-1: #e8e2d0;
+  --text-2: #98a2ad;
+  --text-3: #5c6672;
+  --text-inverse: #0b0e12;
+
+  --border-1: #202836;
+  --border-2: #31405a;
+
+  --accent: #ffa51e;
+  --accent-strong: #ffc04d;
+  --accent-soft: rgba(255, 165, 30, 0.12);
+
+  --success: #34d399;
+  --warning: #ffb43a;
+  --danger: #ff5c6c;
+  --info: #5eb6ff;
+
+  --shadow-1: none;
+  --shadow-2: none;
+  --shadow-3: none;
+  --glow: 0 0 0 1px var(--border-2);
+
+  --scrollbar-bg: transparent;
+  --scrollbar-thumb: #31405a;
+
+  --color-bg-1: var(--bg-app);
+  --color-bg-2: var(--bg-raised);
+  --color-bg-3: var(--bg-subtle);
+  --color-bg-4: var(--bg-raised);
+  --color-bg-5: var(--bg-raised);
+  --color-bg-white: var(--bg-raised);
+  --color-bg-popup: var(--bg-raised);
+  --color-fill-1: rgba(255, 165, 30, 0.06);
+  --color-fill-2: rgba(255, 165, 30, 0.1);
+  --color-fill-3: rgba(255, 165, 30, 0.16);
+  --color-fill-4: rgba(255, 165, 30, 0.22);
+  --color-text-1: var(--text-1);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-text-4: var(--text-3);
+  --primary-1: rgba(255, 165, 30, 0.1);
+  --primary-2: rgba(255, 165, 30, 0.18);
+  --primary-3: rgba(255, 165, 30, 0.3);
+  --primary-4: rgba(255, 165, 30, 0.52);
+  --primary-5: rgba(255, 165, 30, 0.8);
+  --primary-6: #ffa51e;
+  --primary-7: #e69417;
+  --primary-8: #cc8010;
+  --primary-9: #b36d0b;
+  --primary-10: #995a06;
+  --red-6: 255, 92, 108;
+  --orangered-6: 255, 165, 30;
+  --gold-6: 255, 165, 30;
+  --green-6: 52, 211, 153;
+  --arcoblue-6: 255, 165, 30;
+
+  background: var(--bg-app);
+  color: var(--text-1);
+}
+
+body[data-skin='bloomberg'] h1,
+body[data-skin='bloomberg'] h2,
+body[data-skin='bloomberg'] h3,
+body[data-skin='bloomberg'] .lumina-display,
+body[data-skin='bloomberg'] .lumina-editor-title,
+body[data-skin='bloomberg'] .lumina-label {
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+body[data-skin='bloomberg'] .glass,
+body[data-skin='bloomberg'] .lumina-btn-subtle,
+body[data-skin='bloomberg'] .lumina-tag-count,
+body[data-skin='bloomberg'] .lumina-suggest,
+body[data-skin='bloomberg'] .lumina-note-linker {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+body[data-skin='bloomberg'] .lumina-btn {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 4px;
+  box-shadow: none !important;
+}
+
+body[data-skin='bloomberg'] .lumina-btn-primary {
+  background: var(--accent);
+  color: #0b0e12;
+  border-color: transparent;
+}
+body[data-skin='bloomberg'] .lumina-btn-primary:hover:not(.is-disabled) {
+  background: var(--accent-strong);
+}
+
+body[data-skin='bloomberg'] .lumina-btn-outline {
+  background: transparent;
+  color: var(--text-1);
+  border-color: var(--border-2);
+}
+body[data-skin='bloomberg'] .lumina-btn-outline:hover:not(.is-disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+body[data-skin='bloomberg'] .lumina-btn-subtle {
+  background: var(--bg-raised);
+  color: var(--text-2);
+  border-color: var(--border-2);
+}
+body[data-skin='bloomberg'] .lumina-btn-subtle:hover:not(.is-disabled) {
+  background: var(--bg-subtle);
+  color: var(--text-1);
+}
+
+body[data-skin='bloomberg'] .lumina-nav {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 4px;
+}
+
+body[data-skin='bloomberg'] .lumina-filter,
+body[data-skin='bloomberg'] .lumina-tagchip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+body[data-skin='bloomberg'] *,
+body[data-skin='bloomberg'] *::before,
+body[data-skin='bloomberg'] *::after {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ================================================================
+   Skin 3 · Effect（赛博玻璃 dashboard）
+   深底玻璃 + 青辉光、HUD 数字字体，克制的玻璃网格底。
+   ================================================================ */
+body[data-skin='effect'] {
+  --font-display: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
+  --font-body: 'Inter Variable', -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  --font-mono: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', 'PingFang SC', monospace;
+
+  --bg-app: #0a0d16;
+  --bg-raised: #111726;
+  --bg-subtle: #182034;
+
+  --glass-bg: rgba(17, 25, 41, 0.55);
+  --glass-border: rgba(125, 205, 255, 0.14);
+  --glass-hi: rgba(255, 255, 255, 0.05);
+  --glass-blur: saturate(140%) blur(18px);
+
+  --text-1: #e6f1fb;
+  --text-2: #9db7cf;
+  --text-3: #5e7a94;
+  --text-inverse: #0a0d16;
+
+  --border-1: rgba(125, 205, 255, 0.1);
+  --border-2: rgba(125, 205, 255, 0.24);
+
+  --accent: #22d3ee;
+  --accent-strong: #67e8f9;
+  --accent-soft: rgba(34, 211, 238, 0.12);
+
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #fb7185;
+  --info: #22d3ee;
+
+  --shadow-1: 0 0 0 1px rgba(125, 205, 255, 0.08), 0 4px 20px rgba(4, 10, 24, 0.35);
+  --shadow-2: 0 0 0 1px rgba(125, 205, 255, 0.14), 0 12px 40px rgba(4, 10, 24, 0.5);
+  --shadow-3: 0 0 0 1px rgba(125, 205, 255, 0.18), 0 24px 64px rgba(4, 10, 24, 0.6);
+  --glow: 0 0 0 1px rgba(34, 211, 238, 0.4), 0 0 24px rgba(34, 211, 238, 0.14);
+
+  --scrollbar-bg: transparent;
+  --scrollbar-thumb: rgba(34, 211, 238, 0.3);
+
+  --color-bg-1: var(--bg-app);
+  --color-bg-2: var(--bg-raised);
+  --color-bg-3: var(--bg-subtle);
+  --color-bg-4: var(--bg-raised);
+  --color-bg-5: var(--bg-raised);
+  --color-bg-white: var(--bg-raised);
+  --color-bg-popup: var(--bg-raised);
+  --color-fill-1: rgba(34, 211, 238, 0.06);
+  --color-fill-2: rgba(34, 211, 238, 0.1);
+  --color-fill-3: rgba(34, 211, 238, 0.16);
+  --color-fill-4: rgba(34, 211, 238, 0.22);
+  --color-text-1: var(--text-1);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-text-4: var(--text-3);
+  --primary-1: rgba(34, 211, 238, 0.1);
+  --primary-2: rgba(34, 211, 238, 0.18);
+  --primary-3: rgba(34, 211, 238, 0.3);
+  --primary-4: rgba(34, 211, 238, 0.52);
+  --primary-5: rgba(34, 211, 238, 0.8);
+  --primary-6: #22d3ee;
+  --primary-7: #06b6d4;
+  --primary-8: #0891b2;
+  --primary-9: #0e7490;
+  --primary-10: #155e75;
+  --red-6: 251, 113, 133;
+  --orangered-6: 34, 211, 238;
+  --gold-6: 251, 191, 36;
+  --green-6: 52, 211, 153;
+  --arcoblue-6: 34, 211, 238;
+
+  background: var(--bg-app);
+  background-image:
+    linear-gradient(rgba(125, 205, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(125, 205, 255, 0.03) 1px, transparent 1px);
+  background-size: 44px 44px;
+  color: var(--text-1);
+}
+
+body[data-skin='effect'] .lumina-btn {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 8px;
+  box-shadow: none !important;
+}
+
+body[data-skin='effect'] .lumina-btn-primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #0a0d16;
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.35), 0 0 0 1px rgba(34, 211, 238, 0.4) !important;
+}
+
+body[data-skin='effect'] .lumina-filter,
+body[data-skin='effect'] .lumina-tagchip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+body[data-skin='effect'] .lumina-nav {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 8px;
+}
+
+body[data-skin='effect'] *,
+body[data-skin='effect'] *::before,
+body[data-skin='effect'] *::after {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ================================================================
+   Skin 4 · Glass（科技玻璃 · 精修浅色）
+   轻盈通透的玻璃拟态：柔和层次、克制的青色锚点、清晰的层级。
+   ================================================================ */
+body[data-skin='glass'] {
+  --font-display: 'Sora Variable', 'Inter Variable', -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  --font-body: 'Inter Variable', -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+
+  --bg-app: #eef2f7;
+  --bg-raised: #ffffff;
+  --bg-subtle: #e5ebf3;
+
+  --glass-bg: rgba(255, 255, 255, 0.62);
+  --glass-border: rgba(28, 55, 96, 0.1);
+  --glass-hi: rgba(255, 255, 255, 0.78);
+  --glass-blur: saturate(150%) blur(20px);
+
+  --text-1: #16233b;
+  --text-2: #47596f;
+  --text-3: #8ba0b8;
+  --text-inverse: rgba(255, 255, 255, 0.94);
+
+  --border-1: rgba(28, 55, 96, 0.08);
+  --border-2: rgba(28, 55, 96, 0.16);
+
+  --accent: #2f7df6;
+  --accent-strong: #1a5fd0;
+  --accent-soft: rgba(47, 125, 246, 0.1);
+
+  --success: #17a463;
+  --warning: #e08a00;
+  --danger: #e5484d;
+  --info: #2f7df6;
+
+  --shadow-1: 0 1px 2px rgba(18, 32, 56, 0.05);
+  --shadow-2: 0 6px 24px rgba(18, 32, 56, 0.08);
+  --shadow-3: 0 16px 48px rgba(18, 32, 56, 0.12);
+  --glow: 0 0 0 1px var(--glass-border), 0 8px 32px rgba(47, 125, 246, 0.1);
+
+  --scrollbar-bg: transparent;
+  --scrollbar-thumb: rgba(28, 55, 96, 0.16);
+
+  --color-bg-1: var(--bg-app);
+  --color-bg-2: var(--bg-raised);
+  --color-bg-3: var(--bg-subtle);
+  --color-bg-4: var(--bg-raised);
+  --color-bg-5: var(--bg-raised);
+  --color-bg-white: var(--bg-raised);
+  --color-bg-popup: var(--bg-raised);
+  --color-fill-1: rgba(47, 125, 246, 0.05);
+  --color-fill-2: rgba(47, 125, 246, 0.09);
+  --color-fill-3: rgba(47, 125, 246, 0.14);
+  --color-fill-4: rgba(47, 125, 246, 0.2);
+  --color-text-1: var(--text-1);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-text-4: var(--text-3);
+  --primary-1: rgba(47, 125, 246, 0.09);
+  --primary-2: rgba(47, 125, 246, 0.16);
+  --primary-3: rgba(47, 125, 246, 0.28);
+  --primary-4: rgba(47, 125, 246, 0.5);
+  --primary-5: rgba(47, 125, 246, 0.78);
+  --primary-6: #2f7df6;
+  --primary-7: #1a5fd0;
+  --primary-8: #134aa8;
+  --primary-9: #0d3a85;
+  --primary-10: #0a2f6b;
+  --red-6: 229, 72, 77;
+  --orangered-6: 224, 138, 0;
+  --gold-6: 224, 138, 0;
+  --green-6: 23, 164, 99;
+  --arcoblue-6: 47, 125, 246;
+
+  background: var(--bg-app);
+  color: var(--text-1);
+}

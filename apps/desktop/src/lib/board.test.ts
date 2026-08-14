@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { daysUntil, createWidget, normalizeBoard, WIDGET_INFO } from './board'
+import { daysUntil, createWidget, normalizeBoard, migrateToCanvas, placeWidget, WIDGET_INFO, type BoardWidget } from './board'
 
 describe('daysUntil', () => {
   it('返回今天与目标日期的天数差', () => {
@@ -69,5 +69,43 @@ describe('normalizeBoard', () => {
     const list = normalizeBoard([createWidget('feed'), createWidget('links')])
     expect(list[0].wide).toBe(true)
     expect(list[1].wide).toBe(false)
+  })
+})
+
+describe('migrateToCanvas', () => {
+  it('为 v2 遗留数据分配流式坐标尺寸', () => {
+    const legacy: BoardWidget[] = [
+      { id: 'a', type: 'weekly', title: '周', wide: true },
+      { id: 'b', type: 'stats', title: '统计' },
+      { id: 'c', type: 'todo', title: '待办' },
+    ]
+    const out = migrateToCanvas(legacy)
+    const a = out[0]
+    const b = out[1]
+    expect(a.x).toBe(0)
+    expect(a.y).toBe(0)
+    expect(a.w).toBe(WIDGET_INFO.weekly.size.w)
+    expect(b.x).toBe(0)
+    expect(b.y).toBeGreaterThan(0)
+    expect(b.w).toBe(WIDGET_INFO.stats.size.w)
+    expect(b.h).toBe(WIDGET_INFO.stats.size.h)
+    expect(out.every((w) => w.x !== undefined && w.y !== undefined && w.w !== undefined && w.h !== undefined)).toBe(true)
+  })
+
+  it('跳过已有坐标的组件', () => {
+    const placed = migrateToCanvas([
+      { id: 'a', type: 'stats' as const, title: 'S', x: 10, y: 20, w: 300, h: 200 },
+    ])
+    expect(placed[0]).toMatchObject({ x: 10, y: 20, w: 300, h: 200 })
+  })
+})
+
+describe('placeWidget', () => {
+  it('新组件放在画布底部空位', () => {
+    const existing = [{ id: 'a', type: 'stats' as const, title: 'S', x: 0, y: 0, w: 300, h: 200 }]
+    const pos = placeWidget(existing, 'todo')
+    expect(pos.y).toBeGreaterThanOrEqual(200)
+    expect(pos.w).toBe(WIDGET_INFO.todo.size.w)
+    expect(pos.h).toBe(WIDGET_INFO.todo.size.h)
   })
 })

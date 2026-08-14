@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useBoardStore } from './boardStore'
-import { createWidget } from '../lib/board'
-import type { BoardWidget } from '../lib/board'
+import { useBoardStore, buildDefaultBoard } from './boardStore'
+import { createWidget, widgetsOverlap, migrateToCanvas, type BoardWidget } from '../lib/board'
 
 function fresh() {
   return [
@@ -54,6 +53,26 @@ describe('boardStore', () => {
     expect(useBoardStore.getState().widgets.find((w) => w.id === cd.id)!.countdown).toEqual({ label: '发布', date: '2026-09-01' })
   })
 
+  it('updateLayout 写入自由画布坐标尺寸', () => {
+    const first = useBoardStore.getState().widgets[0]
+    useBoardStore.getState().updateLayout(first.id, { x: 120, y: 80, w: 360, h: 200 })
+    const updated = useBoardStore.getState().widgets.find((w) => w.id === first.id)!
+    expect(updated.x).toBe(120)
+    expect(updated.y).toBe(80)
+    expect(updated.w).toBe(360)
+    expect(updated.h).toBe(200)
+  })
+
+  it('addWidget 为新组件分配画布位置', () => {
+    useBoardStore.getState().addWidget('links')
+    const added = useBoardStore.getState().widgets[useBoardStore.getState().widgets.length - 1]
+    expect(typeof added.x).toBe('number')
+    expect(typeof added.y).toBe('number')
+    expect(typeof added.w).toBe('number')
+    expect(typeof added.h).toBe('number')
+    expect(added.w).toBeGreaterThan(0)
+  })
+
   it('addLink 追加链接', () => {
     useBoardStore.getState().addWidget('links')
     const links = useBoardStore.getState().widgets.find((w) => w.type === 'links')!
@@ -61,5 +80,22 @@ describe('boardStore', () => {
     const list = useBoardStore.getState().widgets.find((w) => w.id === links.id)!.links!
     expect(list.length).toBe(1)
     expect(list[0].title).toBe('GitHub')
+  })
+
+  it('默认看板组件不重叠（修复堆叠 bug）', () => {
+    const board = buildDefaultBoard()
+    expect(board.length).toBeGreaterThan(0)
+    expect(widgetsOverlap(board)).toBe(false)
+  })
+
+  it('migrateToCanvas(force) 重排已堆叠的旧数据', () => {
+    const stacked = [
+      createWidget('stats', { x: 0, y: 16, w: 300, h: 200 }),
+      createWidget('todo', { x: 0, y: 16, w: 300, h: 240 }),
+      createWidget('countdown', { x: 0, y: 16, w: 300, h: 150 }),
+    ]
+    expect(widgetsOverlap(stacked)).toBe(true)
+    const relaid = migrateToCanvas(stacked, true)
+    expect(widgetsOverlap(relaid)).toBe(false)
   })
 })

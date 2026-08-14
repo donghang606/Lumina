@@ -1,10 +1,16 @@
 import { create } from 'zustand'
-import { createWidget, normalizeBoard, uid, type BoardWidget, type TodoItem, type LinkItem, type WidgetType } from '../lib/board'
+import { createWidget, normalizeBoard, migrateToCanvas, widgetsOverlap, placeWidget, uid, type BoardWidget, type TodoItem, type LinkItem, type WidgetType } from '../lib/board'
 
-const LS_KEY = 'lumina.board.v2'
+const LS_KEY = 'lumina.board.v3'
+const LS_KEY_V2 = 'lumina.board.v2'
 const LS_KEY_V1 = 'lumina.board.v1'
 
 export const DEFAULT_BOARD: WidgetType[] = ['weekly', 'stats', 'activity', 'inspiration', 'quadrant', 'todo', 'countdown', 'feed']
+
+/** 按默认顺序生成并流式排布默认看板 */
+export function buildDefaultBoard(): BoardWidget[] {
+  return migrateToCanvas(DEFAULT_BOARD.map((t) => createWidget(t)))
+}
 
 /** 从工作台移除被淘汰的组件类型 */
 function stripObsolete(widgets: BoardWidget[]): BoardWidget[] {
@@ -25,24 +31,40 @@ function load(): BoardWidget[] {
   try {
     const raw = localStorage.getItem(LS_KEY)
     if (raw) {
-      const parsed = normalizeBoard(JSON.parse(raw))
+      const parsed = migrateToCanvas(normalizeBoard(JSON.parse(raw)))
       const cleansed = stripObsolete(parsed)
       if (cleansed.length !== parsed.length) persist(cleansed)
-      return cleansed.length ? cleansed : DEFAULT_BOARD.map((t) => createWidget(t))
+      if (cleansed.length === 0) return buildDefaultBoard()
+      if (widgetsOverlap(cleansed)) {
+        const relaid = stripObsolete(migrateToCanvas(cleansed, true))
+        persist(relaid)
+        return relaid
+      }
+      return cleansed
     }
-    const v1 = localStorage.getItem(LS_KEY_V1)
-    if (v1) {
+    const v2 = localStorage.getItem(LS_KEY_V2)
+    if (v2) {
       try {
-        const migrated = stripObsolete(migrateV1(JSON.parse(v1)))
+        const migrated = stripObsolete(migrateToCanvas(normalizeBoard(JSON.parse(v2))))
         persist(migrated)
         return migrated
       } catch {
         /* ignore */
       }
     }
-    return DEFAULT_BOARD.map((t) => createWidget(t))
+    const v1 = localStorage.getItem(LS_KEY_V1)
+    if (v1) {
+      try {
+        const migrated = stripObsolete(migrateToCanvas(migrateV1(JSON.parse(v1))))
+        persist(migrated)
+        return migrated
+      } catch {
+        /* ignore */
+      }
+    }
+    return buildDefaultBoard()
   } catch {
-    return DEFAULT_BOARD.map((t) => createWidget(t))
+    return buildDefaultBoard()
   }
 }
 
@@ -62,6 +84,7 @@ interface BoardState {
   removeWidget: (id: string) => void
   moveWidget: (from: number, to: number) => void
   updateWidget: (id: string, patch: Partial<BoardWidget>) => void
+  updateLayout: (id: string, layout: { x: number; y: number; w: number; h: number }) => void
   addTodoItem: (widgetId: string, text: string) => void
   toggleTodoItem: (widgetId: string, itemId: string) => void
   removeTodoItem: (widgetId: string, itemId: string) => void
@@ -75,7 +98,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
   editing: false,
   setEditing: (v) => set({ editing: v }),
   addWidget: (type) => {
-    const widgets = [...get().widgets, createWidget(type)]
+    const widgets = [...get().widgets, createWidget(type, placeWidget(get().widgets, type))]
     set({ widgets })
     persist(widgets)
   },
@@ -94,6 +117,11 @@ export const useBoardStore = create<BoardState>((set, get) => ({
   },
   updateWidget: (id, patch) => {
     const widgets = get().widgets.map((w) => (w.id === id ? { ...w, ...patch } : w))
+    set({ widgets })
+    persist(widgets)
+  },
+  updateLayout: (id, layout) => {
+    const widgets = get().widgets.map((w) => (w.id === id ? { ...w, ...layout } : w))
     set({ widgets })
     persist(widgets)
   },
@@ -138,6 +166,8 @@ export const useBoardStore = create<BoardState>((set, get) => ({
   },
   resetBoard: () => {
     localStorage.removeItem(LS_KEY)
-    set({ widgets: DEFAULT_BOARD.map((t) => createWidget(t)), editing: false })
+    localStorage.removeItem(LS_KEY_V2)
+    localStorage.removeItem(LS_KEY_V1)
+    set({ widgets: buildDefaultBoard(), editing: false })
   },
 }))

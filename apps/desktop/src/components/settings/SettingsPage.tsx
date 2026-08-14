@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Typography, Form, Input, Select, Switch, Button, Tabs, Table, Message, Space, Modal, Tag } from '@arco-design/web-react'
-import { Settings as SettingsIcon, Plus, Zap, Server, Palette, Sparkles, BrainCircuit, RefreshCw, Trash2, Database } from 'lucide-react'
+import { Settings as SettingsIcon, Plus, Zap, Server, Palette, Sparkles, BrainCircuit, RefreshCw, Trash2, Database, Mic } from 'lucide-react'
 import { configService } from '../../services/configService'
 import { aiService } from '../../services/aiService'
 import { noteService } from '../../services/noteService'
@@ -23,6 +23,14 @@ export default function SettingsPage() {
   const [providerModal, setProviderModal] = useState<AiProvider | 'new' | null>(null)
   const [mcpModal, setMcpModal] = useState<McpServer | 'new' | null>(null)
   const [form] = Form.useForm()
+  const providerType = Form.useWatch('type', form) ?? 'openai'
+
+  useEffect(() => {
+    if (providerType === 'ollama') {
+      const cur = form.getFieldValue('baseUrl')
+      if (!cur) form.setFieldsValue({ baseUrl: 'http://localhost:11434' })
+    }
+  }, [providerType, form])
   const [aiStatus, setAiStatus] = useState<{ ready: boolean; provider: string; model: string; reason?: string | null; rag?: { hasEmbeddings: boolean } } | null>(null)
   const [testing, setTesting] = useState(false)
   const [embedding, setEmbedding] = useState(false)
@@ -32,6 +40,40 @@ export default function SettingsPage() {
   const importRef = useRef<HTMLInputElement>(null)
   const { setSkin } = useTheme()
   const [serverUrlLocal, setServerUrlLocal] = useState(getServerUrlRaw)
+  const [sttEnabled, setSttEnabled] = useState(false)
+  const [sttBaseUrl, setSttBaseUrl] = useState('')
+  const [sttApiKey, setSttApiKey] = useState('')
+  const [sttModel, setSttModel] = useState('')
+  const [sttSavedKey, setSttSavedKey] = useState('')
+  const [savingStt, setSavingStt] = useState(false)
+  const [taskModels, setTaskModels] = useState<Record<string, string>>({})
+  const [savingTasks, setSavingTasks] = useState(false)
+  const [scanningOllama, setScanningOllama] = useState(false)
+
+  const scanOllamaModels = async () => {
+    setScanningOllama(true)
+    try {
+      const v = form.getFieldsValue()
+      const base = (v.baseUrl as string) || 'http://localhost:11434'
+      const r = await configService.listOllamaModels(base)
+      const names = [...r.chat, ...r.embed]
+      if (names.length === 0) {
+        Message.warning('未发现本地模型，请先在 Ollama 拉取模型（ollama pull）')
+        return
+      }
+      const chat = r.chat[0]
+      const embed = r.embed.find((m) => /(nomic|bge|minilm|mxbai|granite-embed)/i.test(m)) ?? r.embed[0]
+      form.setFieldsValue({
+        models: names.join(','),
+        ...(chat ? { defaultModelHint: chat } : {}),
+      })
+      Message.success(`检测到 ${names.length} 个模型（对话: ${chat ?? '无'}，嵌入: ${embed ?? '无'}）`)
+    } catch {
+      Message.error('无法连接 Ollama，请确认已启动（默认 http://localhost:11434）')
+    } finally {
+      setScanningOllama(false)
+    }
+  }
 
   const testMcpTools = async () => {
     const tools = await mcpService.listTools()
@@ -82,6 +124,14 @@ export default function SettingsPage() {
           configService.listMcpServers(),
         ])
         setSettings(s)
+        if (s) {
+          setSttEnabled(s.sttEnabled)
+          setSttBaseUrl(s.sttBaseUrl ?? '')
+          setSttApiKey('')
+          setSttSavedKey(s.sttApiKey ?? '')
+          setSttModel(s.sttModel ?? '')
+          setTaskModels(s.taskModels ?? {})
+        }
         setProviders(p)
         setMcps(m)
       } catch {
@@ -89,6 +139,16 @@ export default function SettingsPage() {
       }
     })()
   }, [reload])
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'lumina.serverUrl') {
+        setServerUrlLocal(e.newValue ?? '')
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
 
   const saveSettings = async (values: any) => {
     await configService.updateSettings(values)
@@ -161,6 +221,39 @@ export default function SettingsPage() {
     setServerUrlLocal(url)
     setServerUrl(url)
     void configService.updateSettings({ serverUrl: url || null })
+  }
+
+  const saveStt = async () => {
+    setSavingStt(true)
+    try {
+      const saved = await configService.updateSettings({
+        sttEnabled,
+        sttBaseUrl: sttBaseUrl.trim() || null,
+        sttApiKey: sttApiKey.trim() || null,
+        sttModel: sttModel.trim() || null,
+      })
+      if (saved) {
+        setSttSavedKey(saved.sttApiKey ?? '')
+        setSttApiKey('')
+        Message.success('语音转写配置已保存')
+      }
+    } catch {
+      Message.error('保存失败，请确认服务端已启动')
+    } finally {
+      setSavingStt(false)
+    }
+  }
+
+  const saveTaskModels = async () => {
+    setSavingTasks(true)
+    try {
+      await configService.updateSettings({ taskModels })
+      Message.success('任务模型路由已保存')
+    } catch {
+      Message.error('保存失败，请确认服务端已启动')
+    } finally {
+      setSavingTasks(false)
+    }
   }
 
   const download = (name: string, content: string, mime: string) => {
@@ -374,6 +467,80 @@ export default function SettingsPage() {
               ]}
             />
           </Glass>
+
+          <Glass style={{ padding: 'var(--sp-5)', marginTop: 'var(--sp-4)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--sp-3)' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Zap size={13} color="var(--accent)" />
+                <span className="lumina-label">按任务路由模型</span>
+              </div>
+              <Button size="small" type="primary" loading={savingTasks} onClick={() => void saveTaskModels()}>
+                保存路由配置
+              </Button>
+            </div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', lineHeight: 1.7, marginBottom: 'var(--sp-3)' }}>
+              <p style={{ margin: 0 }}>为不同任务指定专用模型（留空则回退使用默认 Provider 的默认模型）。对话用推理模型、嵌入用 embedding 模型、转写用语音模型，可显著降低成本与延迟。</p>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 'var(--sp-3)' }}>
+              {(Object.keys(TASK_MODELS) as (keyof typeof TASK_MODELS)[]).map((key) => (
+                <div key={key}>
+                  <Text style={{ fontSize: 'var(--text-sm)', color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>{TASK_MODELS[key]}</Text>
+                  <Input
+                    value={taskModels[key] ?? ''}
+                    placeholder={key === 'embed' ? '如 text-embedding-3-small' : key === 'transcribe' ? '如 whisper-1' : '默认模型'}
+                    onChange={(v) => setTaskModels((prev) => ({ ...prev, [key]: v }))}
+                  />
+                </div>
+              ))}
+            </div>
+          </Glass>
+
+          <Glass style={{ padding: 'var(--sp-5)', marginTop: 'var(--sp-4)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--sp-3)' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Mic size={13} color="var(--accent)" />
+                <span className="lumina-label">语音转写（独立 STT）</span>
+              </div>
+              <Button size="small" type="primary" loading={savingStt} onClick={() => void saveStt()}>
+                保存语音转写
+              </Button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 'var(--sp-2)' }}>
+              <Switch checked={sttEnabled} onChange={setSttEnabled} />
+              <Text style={{ fontSize: 'var(--text-sm)', color: 'var(--text-2)' }}>启用独立语音转写（不勾选时回退使用默认 Provider）</Text>
+            </div>
+            <FormItem label="Base URL" style={{ marginBottom: 'var(--sp-2)' }}>
+              <Input
+                value={sttBaseUrl}
+                onChange={setSttBaseUrl}
+                placeholder="如 https://api.groq.com/openai/v1（支持 /audio/transcriptions）"
+                style={{ maxWidth: 420 }}
+              />
+            </FormItem>
+            <div style={{ display: 'flex', gap: 'var(--sp-3)', flexWrap: 'wrap' }}>
+              <FormItem label="API Key" style={{ marginBottom: 'var(--sp-2)', minWidth: 260, flex: 1 }}>
+                <Input.Password
+                  value={sttApiKey}
+                  onChange={setSttApiKey}
+                  placeholder={sttSavedKey ? `已保存密钥 ${sttSavedKey}，留空保持不变` : '粘贴 API Key'}
+                  style={{ maxWidth: 420 }}
+                />
+              </FormItem>
+              <FormItem label="转写模型" style={{ marginBottom: 'var(--sp-2)', minWidth: 240, flex: 1 }}>
+                <Input
+                  value={sttModel}
+                  onChange={setSttModel}
+                  placeholder="whisper-large-v3（默认 whisper-1）"
+                  style={{ maxWidth: 320 }}
+                />
+              </FormItem>
+            </div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', lineHeight: 1.7, marginTop: 'var(--sp-2)' }}>
+              <p style={{ margin: 0 }}>
+                对接 OpenAI 兼容 <code>/audio/transcriptions</code> 端点的服务商即可（Groq / OpenAI / 自建 whisper.cpp 等）。未启用独立 STT 时，沿用默认 Provider 的 baseUrl，模型名含 whisper/transcribe/audio/stt/speech 时使用，否则回退 whisper-1。
+              </p>
+            </div>
+          </Glass>
         </Tabs.TabPane>
 
         <Tabs.TabPane key="mcp" title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Server size={13} /> MCP Servers</span>}>
@@ -496,7 +663,14 @@ export default function SettingsPage() {
             <Input placeholder="如 https://api.openai.com/v1，本地可留空" />
           </FormItem>
           <FormItem label="模型（逗号分隔）" field="models">
-            <Input placeholder="gpt-4o-mini, gpt-4o" />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <Input placeholder="gpt-4o-mini, gpt-4o" style={{ flex: 1 }} />
+              {providerType === 'ollama' && (
+                <Button size="small" icon={<RefreshCw size={14} />} loading={scanningOllama} onClick={() => void scanOllamaModels()}>
+                  检测本地模型
+                </Button>
+              )}
+            </div>
           </FormItem>
           <FormItem label="设为默认 Provider" field="isActive" triggerPropName="checked">
             <Switch />
@@ -528,4 +702,12 @@ export default function SettingsPage() {
       </Modal>
     </div>
   )
+}
+
+const TASK_MODELS = {
+  chat: '对话（推理）',
+  summary: '摘要',
+  tags: '标签推荐',
+  embed: '向量嵌入',
+  transcribe: '语音转写',
 }

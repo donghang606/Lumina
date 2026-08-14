@@ -1,6 +1,6 @@
 import { router, publicProcedure } from '../trpc/context.js'
 import { z } from 'zod'
-import { notes, noteLinks, tagsOnNotes, tags, noteBlocks } from '../db/schema.js'
+import { notes, noteLinks, tagsOnNotes, tags, noteBlocks, blockRefs, noteTombstones } from '../db/schema.js'
 import { randomUUID } from 'node:crypto'
 import { eq, or, sql, desc, inArray } from 'drizzle-orm'
 import { embedTexts, cosineSimilarity, getActiveProvider } from '../llm/provider.js'
@@ -70,7 +70,13 @@ export const noteRouter = router({
   }),
 
   remove: publicProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
+    const now = new Date().toISOString()
     await ctx.db.delete(notes).where(eq(notes.id, input.id)).run()
+    await ctx.db
+      .insert(noteTombstones)
+      .values({ noteId: input.id, deletedAt: now, deletedBy: 'local' })
+      .onConflictDoUpdate({ target: noteTombstones.noteId, set: { deletedAt: now, deletedBy: 'local' } })
+      .run()
     return { ok: true }
   }),
 
@@ -121,6 +127,54 @@ export const noteRouter = router({
         .where(sql`${noteLinks.sourceNoteId} = ${input.sourceNoteId} AND ${noteLinks.targetNoteId} = ${input.targetNoteId}`)
         .run()
       return { ok: true }
+    }),
+
+  createBlockRef: publicProcedure
+    .input(
+      z.object({
+        sourceNoteId: z.string(),
+        targetNoteId: z.string(),
+        targetBlockId: z.string().nullable().optional(),
+        context: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const now = new Date().toISOString()
+      await ctx.db.insert(blockRefs).values({
+        id: randomUUID(),
+        sourceNoteId: input.sourceNoteId,
+        targetNoteId: input.targetNoteId,
+        targetBlockId: input.targetBlockId,
+        context: input.context,
+        createdAt: now,
+      })
+      return { ok: true }
+    }),
+
+  deleteBlockRef: publicProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
+    await ctx.db.delete(blockRefs).where(eq(blockRefs.id, input.id)).run()
+    return { ok: true }
+  }),
+
+  listBlockRefs: publicProcedure
+    .input(z.object({ noteId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const refs = await ctx.db.select().from(blockRefs).where(eq(blockRefs.targetNoteId, input.noteId)).all()
+      if (refs.length === 0) return []
+      const sourceIds = [...new Set(refs.map((r) => r.sourceNoteId).filter(Boolean))] as string[]
+      const sources = await ctx.db.select({ id: notes.id, title: notes.title }).from(notes).where(inArray(notes.id, sourceIds)).all()
+      const sourceTitle = new Map(sources.map((s) => [s.id, s.title]))
+      const blockIds = [...new Set(refs.map((r) => r.targetBlockId).filter(Boolean))] as string[]
+      const snippets = new Map<string, string>()
+      if (blockIds.length) {
+        const blocks = await ctx.db.select({ id: noteBlocks.id, chunkContent: noteBlocks.chunkContent }).from(noteBlocks).where(inArray(noteBlocks.id, blockIds)).all()
+        for (const b of blocks) snippets.set(b.id, b.chunkContent)
+      }
+      return refs.map((r) => ({
+        ...r,
+        sourceNoteTitle: sourceTitle.get(r.sourceNoteId as string) ?? '(无标题)',
+        blockSnippet: r.targetBlockId ? snippets.get(r.targetBlockId) : undefined,
+      }))
     }),
 
   getBacklinks: publicProcedure.input(z.object({ noteId: z.string() })).query(async ({ ctx, input }) => {
@@ -176,7 +230,7 @@ export const noteRouter = router({
           const chunks: string[] = []
           for (let i = 0; i < clean.length; i += CHUNK) chunks.push(clean.slice(i, i + CHUNK))
           await ctx.db.delete(noteBlocks).where(eq(noteBlocks.noteId, input.noteId)).run()
-          const vectors = await embedTexts(ctx, chunks)
+          const vectors = await embedTexts(ctx, chunks, { task: 'embed' })
           if (vectors.length && vectors[0].length) {
             await ctx.db.insert(noteBlocks).values(
               chunks.map((c, i) => ({
@@ -320,7 +374,7 @@ export const noteRouter = router({
     if (chunks.length === 0) return { ok: false, reason: 'no chunks' }
 
     await ctx.db.delete(noteBlocks).where(eq(noteBlocks.noteId, input.id)).run()
-    const vectors = await embedTexts(ctx, chunks)
+    const vectors = await embedTexts(ctx, chunks, { task: 'embed' })
     await ctx.db.insert(noteBlocks).values(
       chunks.map((c, i) => ({
         id: randomUUID(),
@@ -347,7 +401,7 @@ export const noteRouter = router({
       for (let i = 0; i < clean.length; i += CHUNK) chunks.push(clean.slice(i, i + CHUNK))
       if (!chunks.length) continue
       try {
-        const vectors = await embedTexts(ctx, chunks)
+        const vectors = await embedTexts(ctx, chunks, { task: 'embed' })
         await ctx.db.delete(noteBlocks).where(eq(noteBlocks.noteId, row.id)).run()
         await ctx.db.insert(noteBlocks).values(
           chunks.map((c, i) => ({
@@ -398,7 +452,7 @@ export const noteRouter = router({
       // semantic
       try {
         const blocks = await ctx.db.select().from(noteBlocks).all()
-        const vector = (await embedTexts(ctx, [input.query]))[0]
+        const vector = (await embedTexts(ctx, [input.query], { task: 'embed' }))[0]
         if (!vector || vector.length === 0) throw new Error('no query vector')
 
         const scored: { noteId: string; chunkContent: string; title: string; sim: number }[] = []
@@ -430,6 +484,79 @@ export const noteRouter = router({
         source: 'keyword' as const,
         items: kwMatches.map((m) => ({ id: m.id, title: m.title, snippet: stripNote(m.content), score: m.score })),
       }
+    }),
+
+  related: publicProcedure
+    .input(z.object({ noteId: z.string(), limit: z.number().int().min(1).max(10).default(5) }))
+    .query(async ({ ctx, input }) => {
+      const row = await ctx.db.select().from(notes).where(eq(notes.id, input.noteId)).get()
+      if (!row) return { source: 'keyword' as const, items: [] }
+
+      const clean = (row.content ?? '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\[\[|\]\]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+      const p = await getActiveProvider(ctx)
+      const rows = await ctx.db.select().from(notes).all()
+
+      // semantic: embed up to 3 chunks of the current note, compare against all blocks, exclude self
+      if (p.ready && clean.length > 0) {
+        try {
+          const blocks = await ctx.db.select().from(noteBlocks).all()
+          const vecBlocks = blocks.filter((b) => b.embedding && b.noteId !== input.noteId)
+          if (vecBlocks.length > 0) {
+            const CHUNK = 700
+            const chunks: string[] = []
+            for (let i = 0; i < clean.length; i += CHUNK) chunks.push(clean.slice(i, i + CHUNK))
+            const vectors = await embedTexts(ctx, chunks.slice(0, 3), { task: 'embed' })
+            if (vectors.some((v) => v.length > 0)) {
+              const scored = new Map<string, { noteId: string; chunkContent: string; title: string; sim: number }>()
+              for (const v of vectors) {
+                if (!v.length) continue
+                for (const b of vecBlocks) {
+                  const buf = b.embedding as unknown as Uint8Array
+                  const stored = new Float64Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength))
+                  const vec = Array.from(stored)
+                  if (vec.length !== v.length) continue
+                  const sim = cosineSimilarity(v, vec)
+                  const note = rows.find((n) => n.id === b.noteId)
+                  const prev = scored.get(b.noteId as string)
+                  if (!prev || sim > prev.sim) {
+                    scored.set(b.noteId as string, { noteId: b.noteId as string, chunkContent: b.chunkContent, title: note?.title ?? '(无标题)', sim })
+                  }
+                }
+              }
+              const list = [...scored.values()].sort((a, b) => b.sim - a.sim).slice(0, input.limit)
+              if (list[0]?.sim && list[0].sim > 0.15) {
+                return {
+                  source: 'semantic' as const,
+                  items: list.map((s) => ({ id: s.noteId, title: s.title, snippet: s.chunkContent, score: Math.round(s.sim * 1000) / 1000, source: 'semantic' as const })),
+                }
+              }
+            }
+          }
+        } catch {
+          // fall through to keyword
+        }
+      }
+
+      // keyword fallback: match against title words / content
+      const words = `${row.title ?? ''} ${clean}`.split(/\s+/).filter((w) => w.length >= 2).slice(0, 6)
+      const kwMatches = rows
+        .filter((n) => n.id !== input.noteId)
+        .map((n) => {
+          const hay = `${n.title ?? ''} ${n.content ?? ''}`.toLowerCase()
+          let score = 0
+          for (const w of words) {
+            if (w && hay.includes(w.toLowerCase())) score += w.length
+          }
+          return score > 0 ? { id: n.id, title: n.title, snippet: stripNote(n.content), score } : null
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, input.limit)
+      return { source: 'keyword' as const, items: kwMatches.map((m) => ({ ...m, source: 'keyword' as const })) }
     }),
 })
 

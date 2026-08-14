@@ -12,7 +12,32 @@ export interface Settings {
   autoClassify: boolean
   defaultProviderId: string | null
   defaultModel: string | null
+  taskModels: Record<string, string>
   serverUrl: string | null
+  sttEnabled: boolean
+  sttBaseUrl: string | null
+  sttApiKey: string | null
+  sttModel: string | null
+}
+
+function normalizeSettings(s: any): Settings {
+  return {
+    id: s.id ?? 'main',
+    theme: s.theme ?? 'light',
+    skin: s.skin ?? 'glass',
+    locale: s.locale ?? 'zh-CN',
+    autoTag: s.autoTag ?? true,
+    autoSummary: s.autoSummary ?? true,
+    autoClassify: s.autoClassify ?? false,
+    defaultProviderId: s.defaultProviderId ?? null,
+    defaultModel: s.defaultModel ?? null,
+    taskModels: s.taskModels ?? {},
+    serverUrl: s.serverUrl ?? null,
+    sttEnabled: s.sttEnabled ?? false,
+    sttBaseUrl: s.sttBaseUrl ?? null,
+    sttApiKey: s.sttApiKey ?? null,
+    sttModel: s.sttModel ?? null,
+  }
 }
 
 function normalizeProvider(p: any): AiProvider {
@@ -25,10 +50,12 @@ function normalizeMcp(m: any): McpServer {
 
 export const configService = {
   async getSettings(): Promise<Settings | null> {
-    return (await trpc.config.get.query()) ?? null
+    const r = await trpc.config.get.query()
+    return r ? normalizeSettings(r) : null
   },
   async updateSettings(input: Partial<Settings>): Promise<Settings | null> {
-    return (await trpc.config.update.mutate(input)) ?? null
+    const r = await trpc.config.update.mutate(input)
+    return r ? normalizeSettings(r) : null
   },
   async listProviders(): Promise<AiProvider[]> {
     const list = await trpc.config.listProviders.query()
@@ -48,6 +75,9 @@ export const configService = {
   },
   async deleteProvider(id: string): Promise<{ ok: boolean }> {
     return trpc.config.deleteProvider.mutate({ id })
+  },
+  async listOllamaModels(baseUrl?: string | null): Promise<{ chat: string[]; embed: string[] }> {
+    return trpc.config.listOllamaModels.query({ baseUrl: baseUrl ?? '' })
   },
   async listMcpServers(): Promise<McpServer[]> {
     const list = await trpc.config.listMcpServers.query()

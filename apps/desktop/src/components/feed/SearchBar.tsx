@@ -1,8 +1,9 @@
 import { useState, useRef, useCallback } from 'react'
 import { Message } from '@arco-design/web-react'
-import { Search, Mic, MicOff, Sparkles, StickyNote, Hash, ArrowRight } from 'lucide-react'
+import { Search, Mic, MicOff, Sparkles, StickyNote, Hash, ArrowRight, MessageSquareText, X, ExternalLink } from 'lucide-react'
 import { useNoteStore } from '../../stores/noteStore'
 import { noteService, tagService } from '../../services/noteService'
+import { aiService, type ChatSource } from '../../services/aiService'
 import { transcribeAudio } from '../../services/voiceService'
 import { useLayoutStore } from '../../stores/layoutStore'
 import { setFeedKeyword } from '../../stores/searchStore'
@@ -25,6 +26,9 @@ export default function SearchBar() {
   const [hi, setHi] = useState(0)
   const [recording, setRecording] = useState(false)
   const [searching, setSearching] = useState<string | null>(null)
+  const [askMode, setAskMode] = useState(false)
+  const [asking, setAsking] = useState(false)
+  const [answer, setAnswer] = useState<{ reply: string; sources: ChatSource[] } | null>(null)
   const mediaRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
 
@@ -34,6 +38,32 @@ export default function SearchBar() {
     setSuggestions([])
     if (select) setHi(0)
   }, [])
+
+  const toggleAskMode = () => {
+    setAskMode((m) => !m)
+    setAnswer(null)
+    setSuggestions([])
+  }
+
+  const openSource = (noteId: string) => {
+    setSelected(noteId)
+    setNav('notes')
+  }
+
+  const askAi = async (q: string) => {
+    setAsking(true)
+    setSuggestions([])
+    setAnswer(null)
+    try {
+      const res = await aiService.chat(q)
+      setAnswer({ reply: res.reply, sources: res.sources ?? [] })
+      setSearching(null)
+    } catch {
+      setAnswer({ reply: '⚠️ 无法连接 AI 服务，请确认服务端已启动。', sources: [] })
+    } finally {
+      setAsking(false)
+    }
+  }
 
   const loadSuggestions = async (q: string) => {
     if (!q.trim()) {
@@ -78,6 +108,10 @@ export default function SearchBar() {
   const doSearch = async () => {
     const q = value.trim()
     if (!q) return
+    if (askMode) {
+      void askAi(q)
+      return
+    }
     const tags = [...q.matchAll(/@(\S+)/g)].map((m) => m[1])
     const title = q.replace(/@\S+/g, '').trim()
     if (tags.length > 0 && title) {
@@ -139,7 +173,7 @@ export default function SearchBar() {
         <Search size={16} className="lumina-search-icon" />
         <input
           className="lumina-search-input"
-          placeholder="搜索笔记 / @标签快速记录 / Enter 搜索"
+          placeholder={askMode ? '提问知识库，Enter 获取 AI 回答…' : '搜索笔记 / @标签快速记录 / Enter 搜索'}
           value={value}
           onChange={(e) => onInput(e.target.value)}
           onKeyDown={(e) => {
@@ -158,7 +192,15 @@ export default function SearchBar() {
           >
             {recording ? <MicOff size={15} /> : <Mic size={15} />}
           </button>
-          <button className="lumina-iconbtn" onClick={() => void doSearch()} title="搜索" style={{ color: 'var(--accent)' }}>
+          <button
+            className="lumina-iconbtn"
+            onClick={toggleAskMode}
+            title="AI 问答模式"
+            style={{ color: askMode ? 'var(--accent)' : 'var(--text-3)' }}
+          >
+            {askMode ? <X size={15} /> : <MessageSquareText size={15} />}
+          </button>
+          <button className="lumina-iconbtn" onClick={() => void doSearch()} title={askMode ? '提问' : '搜索'} style={{ color: 'var(--accent)' }}>
             <Sparkles size={15} />
           </button>
         </div>
@@ -190,11 +232,76 @@ export default function SearchBar() {
         </Glass>
       )}
 
+      {answer && (
+        <Glass style={{ marginTop: 'var(--sp-3)', padding: '14px 16px', borderRadius: 'var(--radius-md)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+            <div style={{ fontSize: 'var(--text-md)', color: 'var(--text-1)', lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-word', flex: 1 }}>
+              {answer.reply}
+            </div>
+            <button
+              className="lumina-iconbtn"
+              onClick={() => setAnswer(null)}
+              title="收起"
+              style={{ color: 'var(--text-3)', flexShrink: 0 }}
+            >
+              <X size={14} />
+            </button>
+          </div>
+          {answer.sources.length > 0 && (
+            <div style={{ marginTop: 'var(--sp-3)', borderTop: '1px solid color-mix(in srgb, var(--border) 50%, transparent)', paddingTop: 'var(--sp-2)' }}>
+              <span className="lumina-label" style={{ display: 'block', marginBottom: 6 }}>
+                检索来源（{answer.sources.length}）
+              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {answer.sources.map((s, i) => (
+                  <button
+                    key={`${s.noteId}-${i}`}
+                    onClick={() => openSource(s.noteId)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 10,
+                      padding: '8px 10px',
+                      border: '1px solid color-mix(in srgb, var(--border) 60%, transparent)',
+                      borderRadius: 'var(--radius-sm)',
+                      background: 'color-mix(in srgb, var(--bg-2) 40%, transparent)',
+                      cursor: 'pointer',
+                      color: 'var(--text-1)',
+                      fontSize: 'var(--text-sm)',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                      <span style={{ color: 'var(--accent)', marginRight: 6 }}>#{i + 1}</span>
+                      {s.title || '(无标题)'}
+                    </span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0, color: 'var(--text-3)' }}>
+                      {s.score > 0 && <span style={{ fontSize: 'var(--text-xs)' }}>{Math.round(s.score * 100)}%</span>}
+                      <ExternalLink size={12} />
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </Glass>
+      )}
+
       <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 12 }}>
         <span className="lumina-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <Search size={11} />
-          {searching ? `已锁定「${searching}」 ${feedbackSuffix(searching)}` : '回车记录带 @ 内容 · 其余为全文搜索'}
+          {askMode ? (
+            <MessageSquareText size={11} />
+          ) : (
+            <Search size={11} />
+          )}
+          {askMode
+            ? 'AI 问答模式：基于知识库语义检索回答，并列出引用来源'
+            : searching
+              ? `已锁定「${searching}」 ${feedbackSuffix(searching)}`
+              : '回车记录带 @ 内容 · 其余为全文搜索'}
         </span>
+        {asking && <span className="lumina-label" style={{ color: 'var(--accent)' }}>AI 思考中…</span>}
       </div>
     </div>
   )

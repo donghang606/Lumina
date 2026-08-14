@@ -1,9 +1,17 @@
 import { trpc } from '../lib/trpc'
 
+export interface ChatSource {
+  noteId: string
+  title: string
+  content: string
+  score: number
+}
+
 export interface ChatReply {
   reply: string
   source?: string
   conversationId?: string
+  sources?: ChatSource[]
 }
 
 export interface ConversationSummary {

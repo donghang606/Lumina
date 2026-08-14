@@ -9,6 +9,8 @@ import { extensionRouter } from './extension.js'
 import { insightRouter } from './insight.js'
 import { mcpRouter } from './mcp.js'
 import { transferRouter } from './transfer.js'
+import { viewRouter } from './view.js'
+import { syncRouter } from './sync.js'
 
 export const appRouter = router({
   note: noteRouter,
@@ -21,6 +23,8 @@ export const appRouter = router({
   insight: insightRouter,
   mcp: mcpRouter,
   transfer: transferRouter,
+  view: viewRouter,
+  sync: syncRouter,
 })
 
 export type AppRouter = typeof appRouter

@@ -15,12 +15,27 @@ function getServerUrl(): string {
   return DEFAULT_URL
 }
 
+function buildClient() {
+  return createTRPCClient<AppRouter>({
+    links: [
+      httpBatchLink({
+        url: getServerUrl(),
+      }),
+    ],
+  })
+}
+
+export let trpc = buildClient()
+
 export function setServerUrl(url: string | null) {
-  if (url && url.trim()) {
-    localStorage.setItem('lumina.serverUrl', url.trim())
+  const next = url && url.trim() ? url.trim() : ''
+  if (next === getServerUrlRaw()) return
+  if (next) {
+    localStorage.setItem('lumina.serverUrl', next)
   } else {
     localStorage.removeItem('lumina.serverUrl')
   }
+  trpc = buildClient()
 }
 
 export function getServerUrlRaw(): string {
@@ -30,11 +45,3 @@ export function getServerUrlRaw(): string {
     return ''
   }
 }
-
-export const trpc = createTRPCClient<AppRouter>({
-  links: [
-    httpBatchLink({
-      url: getServerUrl(),
-    }),
-  ],
-})

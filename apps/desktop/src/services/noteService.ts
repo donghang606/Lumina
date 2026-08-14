@@ -1,5 +1,5 @@
 import { trpc } from '../lib/trpc'
-import type { Note, NoteDetail, Stats, Tag, TagWithCount } from '@lumina/shared'
+import type { Note, NoteDetail, Stats, Tag, TagWithCount, RelatedNote, BlockRef } from '@lumina/shared'
 
 export const noteService = {
   async list(): Promise<Note[]> {
@@ -36,6 +36,19 @@ export const noteService = {
     if (!keyword.trim()) return []
     const res = await trpc.note.search.query({ query: keyword, limit: 8 })
     return res.items.map((i) => ({ id: i.id, title: i.title }))
+  },
+  async related(noteId: string, limit?: number): Promise<RelatedNote[]> {
+    const res = await trpc.note.related.query({ noteId, limit: limit ?? 5 })
+    return res.items
+  },
+  async listBlockRefs(noteId: string): Promise<BlockRef[]> {
+    return trpc.note.listBlockRefs.query({ noteId })
+  },
+  async createBlockRef(input: { sourceNoteId: string; targetNoteId: string; targetBlockId?: string | null; context?: string }): Promise<{ ok: boolean }> {
+    return trpc.note.createBlockRef.mutate(input)
+  },
+  async deleteBlockRef(id: string): Promise<{ ok: boolean }> {
+    return trpc.note.deleteBlockRef.mutate({ id })
   },
   async createLink(sourceNoteId: string, targetNoteId: string, context?: string): Promise<{ ok: boolean }> {
     return trpc.note.createLink.mutate({ sourceNoteId, targetNoteId, context })

@@ -28,7 +28,12 @@ const DEFAULT_SETTINGS = {
   autoClassify: false,
   defaultProviderId: null,
   defaultModel: null,
+  taskModels: {},
   serverUrl: null,
+  sttEnabled: false,
+  sttBaseUrl: null,
+  sttApiKey: null,
+  sttModel: null,
 }
 
 describe('configRouter', () => {
@@ -75,6 +80,47 @@ describe('configRouter', () => {
       const caller = configRouter.createCaller({ db: db as any, req: {} as any, res: {} as any })
       const result = await caller.update({ serverUrl: null })
       expect(result?.serverUrl).toBeNull()
+    })
+
+    it('updates stt settings', async () => {
+      const db = createMockDb()
+      db.get.mockReturnValue({
+        ...DEFAULT_SETTINGS,
+        sttEnabled: true,
+        sttBaseUrl: 'https://api.groq.com/openai/v1',
+        sttModel: 'whisper-large-v3',
+      })
+      const caller = configRouter.createCaller({ db: db as any, req: {} as any, res: {} as any })
+      const result = await caller.update({
+        sttEnabled: true,
+        sttBaseUrl: 'https://api.groq.com/openai/v1',
+        sttModel: 'whisper-large-v3',
+      })
+      expect(result?.sttEnabled).toBe(true)
+      expect(result?.sttBaseUrl).toBe('https://api.groq.com/openai/v1')
+      expect(result?.sttModel).toBe('whisper-large-v3')
+      const payload = db.set.mock.calls[0][0]
+      expect(payload.sttEnabled).toBe(true)
+      expect(payload.sttBaseUrl).toBe('https://api.groq.com/openai/v1')
+    })
+
+    it('encrypts stt api key on save', async () => {
+      const db = createMockDb()
+      db.get.mockReturnValue({ ...DEFAULT_SETTINGS })
+      const caller = configRouter.createCaller({ db: db as any, req: {} as any, res: {} as any })
+      await caller.update({ sttApiKey: 'sk-stt-secret' })
+      const payload = db.set.mock.calls[0][0]
+      expect(String(payload.sttApiKey)).toMatch(/^enc:v1:/)
+      expect(payload.sttApiKey).not.toContain('sk-stt-secret')
+    })
+
+    it('keeps existing stt api key when submitting empty', async () => {
+      const db = createMockDb()
+      db.get.mockReturnValue({ ...DEFAULT_SETTINGS, sttApiKey: 'enc:v1:keep' })
+      const caller = configRouter.createCaller({ db: db as any, req: {} as any, res: {} as any })
+      await caller.update({ sttApiKey: '' })
+      const payload = db.set.mock.calls[0][0]
+      expect(payload.sttApiKey).toBe('enc:v1:keep')
     })
   })
 

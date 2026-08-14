@@ -3,10 +3,10 @@ import { render, screen } from '@testing-library/react'
 import Board from './Board'
 
 const mockWidgets = [
-  { id: 'w1', type: 'todo' as const, title: '待办' },
-  { id: 'w2', type: 'countdown' as const, title: '倒计时' },
-  { id: 'w3', type: 'stats' as const, title: '统计' },
-  { id: 'w4', type: 'feed' as const, title: '动态', wide: true },
+  { id: 'w1', type: 'todo' as const, title: '待办', x: 0, y: 0, w: 300, h: 240 },
+  { id: 'w2', type: 'countdown' as const, title: '倒计时', x: 316, y: 0, w: 300, h: 150 },
+  { id: 'w3', type: 'stats' as const, title: '统计', x: 0, y: 256, w: 300, h: 200 },
+  { id: 'w4', type: 'feed' as const, title: '动态', x: 0, y: 472, w: 620, h: 340, wide: true },
 ]
 
 let storeState: any = {
@@ -14,7 +14,7 @@ let storeState: any = {
   editing: false,
   setEditing: vi.fn(),
   addWidget: vi.fn(),
-  moveWidget: vi.fn(),
+  updateLayout: vi.fn(),
   resetBoard: vi.fn(),
 }
 
@@ -30,7 +30,7 @@ describe('Board', () => {
       editing: false,
       setEditing: vi.fn(),
       addWidget: vi.fn(),
-      moveWidget: vi.fn(),
+      updateLayout: vi.fn(),
       resetBoard: vi.fn(),
     }
   })
@@ -54,9 +54,18 @@ describe('Board', () => {
     expect(screen.getByText('动态')).toBeDefined()
   })
 
-  it('renders wide widget with full-width grid column', () => {
+  it('positions widgets with absolute left/top/width/height', () => {
     const { container } = render(<Board />)
-    const wideDiv = container.querySelector('[style*="1 / -1"]')
-    expect(wideDiv).not.toBeNull()
+    const pos = container.querySelectorAll('[style*="position: absolute"]')
+    expect(pos.length).toBeGreaterThanOrEqual(4)
+    const wide = [...pos].some((el) => el.getAttribute('style')?.includes('width: 620px'))
+    expect(wide).toBe(true)
+  })
+
+  it('shows move and resize handles in editing mode', () => {
+    storeState = { ...storeState, editing: true }
+    render(<Board />)
+    expect(screen.getAllByTitle('拖动移动').length).toBeGreaterThan(0)
+    expect(screen.getAllByTitle('拖动调整大小').length).toBeGreaterThan(0)
   })
 })

@@ -8,7 +8,7 @@ import { encryptSecret, decryptSecret, maskSecret } from '../lib/secrets.js'
 
 const DEFAULT_SETTINGS_ID = 'main'
 
-function resolveApiKey(stored: string | null | undefined, submitted: string): string {
+function resolveApiKey(stored: string | null | undefined, submitted: string | null | undefined): string {
   const current = stored ?? ''
   if (!submitted) return current
   const plain = decryptSecret(current)
@@ -31,11 +31,19 @@ export const configRouter = router({
         autoClassify: false,
         defaultProviderId: null,
         defaultModel: null,
+        taskModels: {},
         serverUrl: null,
+        sttEnabled: false,
+        sttBaseUrl: null,
+        sttApiKey: null,
+        sttModel: null,
       }
       await ctx.db.insert(settings).values(row).run()
     }
-    return row
+    return {
+      ...row,
+      sttApiKey: row.sttApiKey ? maskSecret(decryptSecret(row.sttApiKey)) : null,
+    }
   }),
 
   update: publicProcedure
@@ -49,16 +57,31 @@ export const configRouter = router({
         autoClassify: z.boolean().optional(),
         defaultProviderId: z.string().nullable().optional(),
         defaultModel: z.string().nullable().optional(),
+        taskModels: z.record(z.string(), z.string()).optional(),
         serverUrl: z.string().nullable().optional(),
+        sttEnabled: z.boolean().optional(),
+        sttBaseUrl: z.string().nullable().optional(),
+        sttApiKey: z.string().nullable().optional(),
+        sttModel: z.string().nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const { sttApiKey, ...rest } = input
+      const current = await ctx.db.select().from(settings).where(eq(settings.id, DEFAULT_SETTINGS_ID)).get()
+      const payload: Record<string, unknown> = { ...rest }
+      if (sttApiKey !== undefined) {
+        payload.sttApiKey = resolveApiKey(current?.sttApiKey, sttApiKey)
+      }
       await ctx.db
         .update(settings)
-        .set({ ...input })
+        .set(payload)
         .where(eq(settings.id, DEFAULT_SETTINGS_ID))
         .run()
-      return ctx.db.select().from(settings).where(eq(settings.id, DEFAULT_SETTINGS_ID)).get()
+      const saved = await ctx.db.select().from(settings).where(eq(settings.id, DEFAULT_SETTINGS_ID)).get()
+      return {
+        ...saved,
+        sttApiKey: saved?.sttApiKey ? maskSecret(decryptSecret(saved.sttApiKey)) : null,
+      }
     }),
 
   listProviders: publicProcedure.query(async ({ ctx }) => {
@@ -114,6 +137,13 @@ export const configRouter = router({
     await ctx.db.delete(aiProviders).where(eq(aiProviders.id, input.id)).run()
     return { ok: true }
   }),
+
+  listOllamaModels: publicProcedure
+    .input(z.object({ baseUrl: z.string().optional().nullable() }))
+    .query(async ({ input }) => {
+      const { fetchOllamaModels } = await import('../llm/provider.js')
+      return fetchOllamaModels(input.baseUrl ?? '')
+    }),
 
   listMcpServers: publicProcedure.query(async ({ ctx }) => {
     return ctx.db.select().from(mcpServers).orderBy(mcpServers.name).all()

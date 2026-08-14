@@ -97,7 +97,12 @@ export const settings = sqliteTable('settings', {
   autoClassify: integer('auto_classify', { mode: 'boolean' }).notNull().default(false),
   defaultProviderId: text('default_provider_id'),
   defaultModel: text('default_model'),
+  taskModels: text('task_models', { mode: 'json' }).$type<Record<string, string>>().default({}),
   serverUrl: text('server_url'),
+  sttEnabled: integer('stt_enabled', { mode: 'boolean' }).notNull().default(false),
+  sttBaseUrl: text('stt_base_url'),
+  sttApiKey: text('stt_api_key'),
+  sttModel: text('stt_model'),
 })
 
 export const mcpServers = sqliteTable('mcp_servers', {
@@ -118,4 +123,39 @@ export const noteBlocks = sqliteTable('note_blocks', {
   chunkContent: text('chunk_content').notNull(),
   embedding: blob('embedding'),
   tokenCount: integer('token_count').notNull().default(0),
+})
+
+/** 块级引用：从 source 笔记引用 target 笔记的某个块（note_blocks.id） */
+export const blockRefs = sqliteTable('block_refs', {
+  id: text('id').primaryKey(),
+  sourceNoteId: text('source_note_id').references(() => notes.id, { onDelete: 'cascade' }),
+  targetNoteId: text('target_note_id').references(() => notes.id, { onDelete: 'cascade' }),
+  targetBlockId: text('target_block_id').references(() => noteBlocks.id, { onDelete: 'cascade' }),
+  context: text('context'),
+  createdAt: text('created_at').notNull(),
+})
+
+/** 保存的查询视图：按标签 / 关键词 / 最近 / 链接聚合笔记 */
+export const views = sqliteTable('views', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  type: text('type', { enum: ['tag', 'keyword', 'recent', 'backlink'] }).notNull(),
+  config: text('config', { mode: 'json' }).$type<Record<string, unknown>>().default({}),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
+
+/** 已注册的同步设备（本地优先 / 多端合并用） */
+export const syncDevices = sqliteTable('sync_devices', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  lastSeenAt: text('last_seen_at').notNull(),
+  createdAt: text('created_at').notNull(),
+})
+
+/** 删除墓碑：记录已删除的笔记 id，用于跨端合并时传播删除 */
+export const noteTombstones = sqliteTable('note_tombstones', {
+  noteId: text('note_id').primaryKey(),
+  deletedAt: text('deleted_at').notNull(),
+  deletedBy: text('deleted_by').notNull(),
 })

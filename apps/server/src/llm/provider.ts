@@ -18,6 +18,8 @@ export interface ActiveProvider {
   reason?: string
 }
 
+export type ModelTask = 'chat' | 'summary' | 'tags' | 'embed' | 'transcribe'
+
 const DEFAULT_BASE: Record<string, string> = {
   openai: 'https://api.openai.com/v1',
   deepseek: 'https://api.deepseek.com/v1',
@@ -25,7 +27,7 @@ const DEFAULT_BASE: Record<string, string> = {
   anthropic: '',
 }
 
-export async function getActiveProvider(ctx: Context): Promise<ActiveProvider> {
+export async function getActiveProvider(ctx: Context, task?: ModelTask): Promise<ActiveProvider> {
   const conf = await ctx.db.select().from(settings).where(eq(settings.id, 'main')).get()
   let provider = conf?.defaultProviderId
     ? await ctx.db.select().from(aiProviders).where(eq(aiProviders.id, conf.defaultProviderId)).get()
@@ -33,7 +35,8 @@ export async function getActiveProvider(ctx: Context): Promise<ActiveProvider> {
   if (!provider?.isActive) {
     provider = (await ctx.db.select().from(aiProviders).where(eq(aiProviders.isActive, true)).limit(1).all())[0] ?? null
   }
-  const model = conf?.defaultModel || provider?.models?.[0] || 'gpt-4o-mini'
+  const taskModel = task && conf?.taskModels?.[task]
+  const model = taskModel || conf?.defaultModel || provider?.models?.[0] || 'gpt-4o-mini'
 
   if (!provider) {
     return { name: 'none', type: '', apiKey: '', baseUrl: null, model, ready: false, reason: '尚未配置 AI 服务商（Settings → AI Providers）' }
@@ -55,8 +58,8 @@ export async function getActiveProvider(ctx: Context): Promise<ActiveProvider> {
   }
 }
 
-export async function llmChatChatCompletions(ctx: Context, messages: LlmMessage[], opts: { model?: string; maxTokens?: number; temperature?: number } = {}): Promise<string> {
-  const p = await getActiveProvider(ctx)
+export async function llmChatChatCompletions(ctx: Context, messages: LlmMessage[], opts: { model?: string; task?: ModelTask; maxTokens?: number; temperature?: number } = {}): Promise<string> {
+  const p = await getActiveProvider(ctx, opts.task)
   if (!p.ready) throw new Error(p.reason)
   try {
     const res = await fetch(`${p.baseUrl}/chat/completions`, {
@@ -90,8 +93,10 @@ export function isConfigured(ctx: Context): Promise<ActiveProvider> {
   return getActiveProvider(ctx)
 }
 
-export async function embedTexts(ctx: Context, texts: string[], model?: string): Promise<number[][]> {
-  const p = await getActiveProvider(ctx)
+export async function embedTexts(ctx: Context, texts: string[], opts: { model?: string; task?: ModelTask } | string = {}): Promise<number[][]> {
+  const task = typeof opts === 'string' ? undefined : opts.task
+  const model = typeof opts === 'string' ? opts : opts.model
+  const p = await getActiveProvider(ctx, task)
   if (!p.ready) throw new Error(p.reason)
   const embedModel = model ?? p.model
   try {
@@ -131,6 +136,19 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   return dot / (Math.sqrt(na) * Math.sqrt(nb))
 }
 
+const OLLAMA_EMBED_PATTERN = /(embed|nomic|bge|minilm|mxbai|jina|e5-|granite-embed)/i
+
+export async function fetchOllamaModels(baseUrl: string): Promise<{ chat: string[]; embed: string[] }> {
+  const url = `${(baseUrl || 'http://localhost:11434').replace(/\/$/, '')}/api/tags`
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`Ollama /api/tags HTTP ${res.status}`)
+  const json = await res.json()
+  const models = (json?.models as { name?: string }[] | undefined) ?? []
+  const chat = models.map((m) => m.name ?? '').filter(Boolean).filter((n) => !OLLAMA_EMBED_PATTERN.test(n))
+  const embed = models.map((m) => m.name ?? '').filter(Boolean).filter((n) => OLLAMA_EMBED_PATTERN.test(n))
+  return { chat, embed }
+}
+
 export interface LlmTool {
   name: string
   description?: string
@@ -142,8 +160,8 @@ export interface LlmToolCallResult {
   toolCalls?: { id: string; name: string; input: Record<string, unknown> }[]
 }
 
-export async function llmChatChatCompletionsTools(ctx: Context, messages: LlmMessage[], tools: LlmTool[], opts: { model?: string; maxTokens?: number } = {}): Promise<LlmToolCallResult> {
-  const p = await getActiveProvider(ctx)
+export async function llmChatChatCompletionsTools(ctx: Context, messages: LlmMessage[], tools: LlmTool[], opts: { model?: string; task?: ModelTask; maxTokens?: number } = {}): Promise<LlmToolCallResult> {
+  const p = await getActiveProvider(ctx, opts.task)
   if (!p.ready) throw new Error(p.reason)
   try {
     const res = await fetch(`${p.baseUrl}/chat/completions`, {

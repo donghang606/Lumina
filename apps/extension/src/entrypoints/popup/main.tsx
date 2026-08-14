@@ -7,7 +7,8 @@ interface CollectData {
   title: string
   siteName: string
   favicon: string | null
-  content: string
+  html: string
+  text: string
 }
 
 const SERVER_DEFAULT = 'http://localhost:3001'
@@ -26,7 +27,7 @@ function App() {
       const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
       if (!tab?.id) return
       const res = (await browser.tabs.sendMessage(tab.id, { type: 'LUMINA_COLLECT' }).catch(() => undefined)) as CollectData | undefined
-      const fallback = { url: tab.url ?? '', title: tab.title ?? '', siteName: '', favicon: null, content: '' }
+      const fallback = { url: tab.url ?? '', title: tab.title ?? '', siteName: '', favicon: null, html: '', text: '' }
       const d = res && res.url ? res : fallback
       setData(d)
       setTitle(d.title)
@@ -46,7 +47,8 @@ function App() {
         body: JSON.stringify({
           url: data.url,
           title: title.trim() || data.title,
-          content: data.content,
+          html: data.html,
+          content: data.text,
           siteName: data.siteName,
           favicon: data.favicon,
           note: note.trim() || undefined,

@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Typography, Tag as ATag, Empty, Message } from '@arco-design/web-react'
-import { Plus, Tag as TagIcon, CornerUpLeft, CornerUpRight, ArrowRight } from 'lucide-react'
+import { Typography, Tag as ATag, Empty, Message, Spin } from '@arco-design/web-react'
+import { Plus, Tag as TagIcon, CornerUpLeft, CornerUpRight, ArrowRight, Sparkles, Blocks } from 'lucide-react'
 import { useNoteStore } from '../../stores/noteStore'
 import { noteService } from '../../services/noteService'
 import { configService } from '../../services/configService'
 import { mdToPlainText } from '../../lib/markdown'
 import NoteEditor from './NoteEditor'
-import type { NoteDetail } from '@lumina/shared'
+import type { NoteDetail, RelatedNote, BlockRef } from '@lumina/shared'
 import UiButton from '../ui/UiButton'
 import { Glass } from '../ui/primitives'
 
@@ -23,6 +23,49 @@ export default function NotesPage() {
   const [detailMap, setDetailMap] = useState<Record<string, NoteDetail>>({})
   const [editing, setEditing] = useState<EditingState | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [related, setRelated] = useState<RelatedNote[]>([])
+  const [relatedLoading, setRelatedLoading] = useState(false)
+  const [blockRefs, setBlockRefs] = useState<BlockRef[]>([])
+
+  useEffect(() => {
+    if (editing?.noteId) {
+      let cancelled = false
+      noteService
+        .listBlockRefs(editing.noteId)
+        .then((refs) => {
+          if (!cancelled) setBlockRefs(refs)
+        })
+        .catch(() => {
+          if (!cancelled) setBlockRefs([])
+        })
+      return () => {
+        cancelled = true
+      }
+    }
+    setBlockRefs([])
+  }, [editing?.noteId, editing?.content])
+
+  useEffect(() => {
+    if (editing?.noteId) {
+      let cancelled = false
+      setRelatedLoading(true)
+      const t = setTimeout(async () => {
+        try {
+          const items = await noteService.related(editing.noteId)
+          if (!cancelled) setRelated(items)
+        } catch {
+          if (!cancelled) setRelated([])
+        } finally {
+          if (!cancelled) setRelatedLoading(false)
+        }
+      }, 300)
+      return () => {
+        cancelled = true
+        clearTimeout(t)
+      }
+    }
+    setRelated([])
+  }, [editing?.noteId, editing?.content])
 
   useEffect(() => {
     if (!loaded) void loadNotes()
@@ -181,6 +224,31 @@ export default function NotesPage() {
             {detail.backlinks.length === 0 && <Text type="secondary" style={{ fontSize: 'var(--text-sm)' }}>暂无反向链接</Text>}
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: 'var(--sp-4) 0 var(--sp-2)' }}>
+              <Blocks size={13} color="var(--accent)" />
+              <Text style={{ fontWeight: 600, fontSize: 'var(--text-md)', color: 'var(--text-1)' }}>块级引用 {blockRefs.length}</Text>
+            </div>
+            {blockRefs.length > 0 ? (
+              blockRefs.map((r) => (
+                <div key={r.id} style={{ marginBottom: 10 }}>
+                  <div
+                    className="lumina-side-link"
+                    onClick={() => r.sourceNoteId && void openNote(r.sourceNoteId)}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
+                  >
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{r.sourceNoteTitle || '(无标题)'}</span>
+                  </div>
+                  {r.blockSnippet && (
+                    <Text type="secondary" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', display: 'block', lineHeight: 1.5, padding: '4px 8px' }}>
+                      {mdToPlainText(r.blockSnippet).slice(0, 60)}
+                    </Text>
+                  )}
+                </div>
+              ))
+            ) : (
+              <Text type="secondary" style={{ fontSize: 'var(--text-sm)' }}>暂无块级引用</Text>
+            )}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: 'var(--sp-4) 0 var(--sp-2)' }}>
               <CornerUpRight size={13} color="var(--warning)" />
               <Text style={{ fontWeight: 600, fontSize: 'var(--text-md)', color: 'var(--text-1)' }}>出链 {detail.outlinks.length}</Text>
             </div>
@@ -194,6 +262,29 @@ export default function NotesPage() {
               </div>
             ))}
             {detail.outlinks.length === 0 && <Text type="secondary" style={{ fontSize: 'var(--text-sm)' }}>暂未链接其他笔记</Text>}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: 'var(--sp-4) 0 var(--sp-2)' }}>
+              <Sparkles size={13} color="var(--accent)" />
+              <Text style={{ fontWeight: 600, fontSize: 'var(--text-md)', color: 'var(--text-1)' }}>语义相关</Text>
+              {relatedLoading && <Spin size={12} />}
+            </div>
+            {related.length > 0 ? (
+              related.map((r) => (
+                <div
+                  key={r.id}
+                  className="lumina-side-link"
+                  onClick={() => void openNote(r.id)}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
+                >
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{r.title || '(无标题)'}</span>
+                  {r.score > 0 && (
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', flexShrink: 0 }}>{Math.round(r.score * 100)}%</span>
+                  )}
+                </div>
+              ))
+            ) : (
+              !relatedLoading && <Text type="secondary" style={{ fontSize: 'var(--text-sm)' }}>暂无语义相关（先向量化笔记后生效）</Text>
+            )}
           </Glass>
         )}
       </div>

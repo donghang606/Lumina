@@ -238,12 +238,12 @@ body[data-skin='nothing'] .lumina-btn-outline:hover:not(.is-disabled) {
 }
 
 body[data-skin='nothing'] .lumina-btn-subtle {
-  background: var(--bg-raised);
-  color: var(--text-2);
+  background: var(--bg-subtle);
+  color: var(--text-1);
   border-color: var(--border-2);
 }
 body[data-skin='nothing'] .lumina-btn-subtle:hover:not(.is-disabled) {
-  background: var(--bg-subtle);
+  background: var(--glass-hi);
   color: var(--text-1);
 }
 
@@ -463,13 +463,14 @@ body[data-skin='bloomberg'] .lumina-btn-outline:hover:not(.is-disabled) {
 }
 
 body[data-skin='bloomberg'] .lumina-btn-subtle {
-  background: var(--bg-raised);
-  color: var(--text-2);
+  background: var(--bg-subtle);
+  color: var(--text-1);
   border-color: var(--border-2);
 }
 body[data-skin='bloomberg'] .lumina-btn-subtle:hover:not(.is-disabled) {
-  background: var(--bg-subtle);
+  background: var(--glass-hi);
   color: var(--text-1);
+  border-color: var(--accent);
 }
 
 body[data-skin='bloomberg'] .lumina-nav {
@@ -589,6 +590,29 @@ body[data-skin='effect'] .lumina-btn-primary {
   background: linear-gradient(135deg, var(--accent), var(--accent-strong));
   color: #0a0d16;
   box-shadow: 0 0 20px rgba(34, 211, 238, 0.35), 0 0 0 1px rgba(34, 211, 238, 0.4) !important;
+}
+
+body[data-skin='effect'] .lumina-btn-subtle {
+  background: var(--glass-hi);
+  color: var(--text-1);
+  border-color: var(--border-2);
+  box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.12);
+}
+body[data-skin='effect'] .lumina-btn-subtle:hover:not(.is-disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.28), 0 0 16px rgba(34, 211, 238, 0.12);
+}
+
+body[data-skin='effect'] .lumina-btn-outline {
+  background: transparent;
+  color: var(--text-1);
+  border-color: var(--border-2);
+}
+body[data-skin='effect'] .lumina-btn-outline:hover:not(.is-disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.3);
 }
 
 body[data-skin='effect'] .lumina-filter,

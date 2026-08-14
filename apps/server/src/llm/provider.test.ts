@@ -3,7 +3,7 @@ import { createClient, type Client } from '@libsql/client'
 import { drizzle } from 'drizzle-orm/libsql'
 import * as schema from '../db/schema.js'
 import { initDb } from '../db/client.js'
-import { getActiveProvider, cosineSimilarity } from './provider.js'
+import { getActiveProvider, cosineSimilarity, fetchOllamaModels } from './provider.js'
 import type { Context } from '../trpc/context.js'
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
@@ -92,6 +92,28 @@ describe('provider', () => {
       expect(p.ready).toBe(false)
       expect(p.reason).toContain('缺少 baseUrl')
     })
+
+    it('uses task-specific model when configured', async () => {
+      await insertProvider({ id: 'a', isActive: true, apiKey: 'sk-a', models: ['gpt-4o'] })
+      await ctx.db.insert(schema.settings).values({ id: 'main', taskModels: { chat: 'gpt-4o', embed: 'text-embedding-3-small' } })
+      const chat = await getActiveProvider(ctx, 'chat')
+      expect(chat.model).toBe('gpt-4o')
+      const embed = await getActiveProvider(ctx, 'embed')
+      expect(embed.model).toBe('text-embedding-3-small')
+    })
+
+    it('falls back to defaultModel then provider model for tasks', async () => {
+      await insertProvider({ id: 'a', isActive: true, apiKey: 'sk-a', models: ['deepseek-chat'] })
+      await ctx.db.insert(schema.settings).values({ id: 'main', defaultModel: 'deepseek-chat', taskModels: {} })
+      const p = await getActiveProvider(ctx, 'tags')
+      expect(p.model).toBe('deepseek-chat')
+    })
+
+    it('task routing does not change default behavior when no settings', async () => {
+      await insertProvider({ id: 'a', isActive: true, apiKey: 'sk-a', models: ['gpt-4o-mini'] })
+      const p = await getActiveProvider(ctx, 'summary')
+      expect(p.model).toBe('gpt-4o-mini')
+    })
   })
 
   describe('cosineSimilarity', () => {
@@ -111,6 +133,46 @@ describe('provider', () => {
       expect(cosineSimilarity([], [1, 2])).toBe(0)
       expect(cosineSimilarity([1, 2], [1])).toBe(0)
       expect(cosineSimilarity([0, 0], [0, 0])).toBe(0)
+    })
+  })
+
+  describe('fetchOllamaModels', () => {
+    it('partitions chat vs embedding models', async () => {
+      const fake = async (url: string) => {
+        expect(url).toBe('http://localhost:11434/api/tags')
+        return {
+          ok: true,
+          json: async () => ({
+            models: [
+              { name: 'llama3.2:3b' },
+              { name: 'qwen2.5:7b' },
+              { name: 'nomic-embed-text:latest' },
+              { name: 'bge-m3:latest' },
+            ],
+          }),
+        } as unknown as Response
+      }
+      const orig = globalThis.fetch
+      globalThis.fetch = fake as any
+      try {
+        const r = await fetchOllamaModels('http://localhost:11434')
+        expect(r.chat).toEqual(['llama3.2:3b', 'qwen2.5:7b'])
+        expect(r.embed).toEqual(['nomic-embed-text:latest', 'bge-m3:latest'])
+      } finally {
+        globalThis.fetch = orig
+      }
+    })
+
+    it('returns empty lists when no models', async () => {
+      const orig = globalThis.fetch
+      globalThis.fetch = (async () => ({ ok: true, json: async () => ({ models: [] }) })) as any
+      try {
+        const r = await fetchOllamaModels('')
+        expect(r.chat).toEqual([])
+        expect(r.embed).toEqual([])
+      } finally {
+        globalThis.fetch = orig
+      }
     })
   })
 })

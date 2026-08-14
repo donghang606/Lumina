@@ -112,6 +112,48 @@ export interface SearchResult {
   title: string
 }
 
+export interface RelatedNote {
+  id: string
+  title: string
+  snippet: string
+  score: number
+  source: 'semantic' | 'keyword'
+}
+
+/** 块级引用：指向某篇笔记的某个块 */
+export interface BlockRef {
+  id: string
+  sourceNoteId: string | null
+  targetNoteId: string | null
+  targetBlockId: string | null
+  context: string | null
+  createdAt: string
+  /** 入链笔记标题（join 结果，可选） */
+  sourceNoteTitle?: string
+  /** 被引用块的片段（join 结果，可选） */
+  blockSnippet?: string
+}
+
+/** 查询视图类型 */
+export type ViewType = 'tag' | 'keyword' | 'recent' | 'backlink'
+
+/** 保存的查询视图：按谓词动态聚合笔记 */
+export interface QueryView {
+  id: string
+  name: string
+  type: ViewType
+  config: Record<string, unknown> | null
+  createdAt: string
+  updatedAt: string
+}
+
+/** 视图执行结果 */
+export interface QueryViewResult {
+  view: QueryView | null
+  items: { id: string; title: string; type: Note['type']; snippet: string; updatedAt: string }[]
+  total: number
+}
+
 export interface ActivityDay {
   date: string
   count: number

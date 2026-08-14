@@ -80,7 +80,9 @@ export async function initDb(c = client) {
     locale TEXT NOT NULL DEFAULT 'zh-CN',
     auto_tag INTEGER NOT NULL DEFAULT 1, auto_summary INTEGER NOT NULL DEFAULT 1,
     auto_classify INTEGER NOT NULL DEFAULT 0,
-    default_provider_id TEXT, default_model TEXT, server_url TEXT
+    default_provider_id TEXT, default_model TEXT, server_url TEXT,
+    stt_enabled INTEGER NOT NULL DEFAULT 0, stt_base_url TEXT,
+    stt_api_key TEXT, stt_model TEXT
   )`)
 
   await migrateSettingsColumns(sql)
@@ -96,6 +98,31 @@ export async function initDb(c = client) {
     id TEXT PRIMARY KEY, note_id TEXT REFERENCES notes(id) ON DELETE CASCADE,
     idx INTEGER NOT NULL DEFAULT 0, chunk_content TEXT NOT NULL,
     embedding BLOB, token_count INTEGER NOT NULL DEFAULT 0
+  )`)
+
+  await sql.execute(`CREATE TABLE IF NOT EXISTS block_refs (
+    id TEXT PRIMARY KEY,
+    source_note_id TEXT REFERENCES notes(id) ON DELETE CASCADE,
+    target_note_id TEXT REFERENCES notes(id) ON DELETE CASCADE,
+    target_block_id TEXT REFERENCES note_blocks(id) ON DELETE CASCADE,
+    context TEXT, created_at TEXT NOT NULL
+  )`)
+
+  await sql.execute(`CREATE TABLE IF NOT EXISTS views (
+    id TEXT PRIMARY KEY, name TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'keyword',
+    config TEXT DEFAULT '{}',
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  )`)
+
+  await sql.execute(`CREATE TABLE IF NOT EXISTS sync_devices (
+    id TEXT PRIMARY KEY, name TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL, created_at TEXT NOT NULL
+  )`)
+
+  await sql.execute(`CREATE TABLE IF NOT EXISTS note_tombstones (
+    note_id TEXT PRIMARY KEY, deleted_at TEXT NOT NULL,
+    deleted_by TEXT NOT NULL
   )`)
 
   await migrateLegacyApiKeys(sql)
@@ -119,5 +146,18 @@ async function migrateSettingsColumns(sql: ReturnType<typeof createClient>) {
     await sql.execute(`ALTER TABLE settings ADD COLUMN skin TEXT NOT NULL DEFAULT 'glass'`)
   } catch {
     // column already exists
+  }
+  for (const stmt of [
+    `ALTER TABLE settings ADD COLUMN stt_enabled INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE settings ADD COLUMN stt_base_url TEXT`,
+    `ALTER TABLE settings ADD COLUMN stt_api_key TEXT`,
+    `ALTER TABLE settings ADD COLUMN stt_model TEXT`,
+    `ALTER TABLE settings ADD COLUMN task_models TEXT NOT NULL DEFAULT '{}'`,
+  ]) {
+    try {
+      await sql.execute(stmt)
+    } catch {
+      // column already exists
+    }
   }
 }

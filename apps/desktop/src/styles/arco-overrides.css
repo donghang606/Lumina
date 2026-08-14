@@ -169,3 +169,34 @@ body[arco-theme='dark'] {
 .arco-btn-primary {
   box-shadow: var(--shadow-1);
 }
+
+/* 默认按钮：与卡片拉开一档层级，避免深色下"消失" */
+.arco-btn-secondary,
+.arco-btn-default {
+  background: var(--bg-subtle);
+  border-color: var(--border-2);
+  color: var(--text-1);
+}
+.arco-btn-secondary:hover,
+.arco-btn-default:hover,
+.arco-btn-secondary:active,
+.arco-btn-default:active {
+  background: var(--glass-hi);
+  border-color: var(--accent);
+  color: var(--text-1);
+}
+
+/* 文字按钮：常态下保持可辨识 */
+.arco-btn-text {
+  color: var(--color-text-2);
+}
+.arco-btn-text:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.arco-btn-text[status='danger'] {
+  color: var(--danger);
+}
+.arco-btn-text[status='danger']:hover {
+  background: rgba(229, 72, 77, 0.12);
+}

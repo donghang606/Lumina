@@ -58,14 +58,15 @@ export const aiRouter = router({
         .limit(50)
         .all()
 
-      // Semantic RAG search (falls back to keyword when no provider / no vectors)
-      let cached: { title: string; content: string; id: string }[] = []
+      // Semantic RAG search (falls back to keyword when no provider / no vectors).
+      // Returns structured sources so the frontend can show retrievable citations.
+      let sources: { noteId: string; title: string; content: string; score: number }[] = []
       try {
         const r = await ctx.db.select().from(notes).all()
         const blocks = await ctx.db.select().from(noteBlocks).all()
         if (blocks.some((b) => b.embedding)) {
-          const { embedTexts, cosineSimilarity } = await import('../llm/provider.js')
-          const vector = (await embedTexts(ctx, [q]))[0]
+        const { embedTexts, cosineSimilarity } = await import('../llm/provider.js')
+          const vector = (await embedTexts(ctx, [q], { task: 'embed' }))[0]
           if (vector?.length) {
             const scored = blocks
               .filter((b) => b.embedding)
@@ -73,33 +74,35 @@ export const aiRouter = router({
                 const buf = b.embedding as unknown as Uint8Array
                 const stored = new Float64Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength))
                 const note = r.find((n) => n.id === b.noteId)
-                return { noteId: b.noteId as string, title: note?.title ?? '', content: b.chunkContent, sim: cosineSimilarity(vector, Array.from(stored)) }
+                return { noteId: b.noteId as string, title: note?.title ?? '(无标题)', content: b.chunkContent, score: cosineSimilarity(vector, Array.from(stored)) }
               })
-              .sort((a, b) => b.sim - a.sim)
+              .sort((a, b) => b.score - a.score)
               .slice(0, 6)
-            if (scored[0]?.sim && scored[0].sim > 0.15) cached = scored.map((s) => ({ id: s.noteId, title: s.title, content: s.content }))
+            if (scored[0]?.score && scored[0].score > 0.15) sources = scored
           }
         }
       } catch {
         // ignore, fall to keyword
       }
 
-      if (cached.length === 0) {
+      if (sources.length === 0) {
         const kw = q.length <= 8 ? q : q.split(/\s+/).slice(-1)[0]
-        cached = await ctx.db
+        const kwHits = await ctx.db
           .select({ title: notes.title, content: notes.content, id: notes.id })
           .from(notes)
           .where(or(like(notes.title, `%${q}%`), like(notes.content, `%${q}%`), like(notes.title, `%${kw}%`), like(notes.content, `%${kw}%`)))
           .limit(6)
           .all()
+        sources = kwHits.map((m) => ({ noteId: m.id as string, title: m.title ?? '(无标题)', content: m.content, score: 0 }))
       }
+      const cached = sources.map((s) => ({ id: s.noteId, title: s.title, content: s.content }))
 
       if (!p.ready) {
         const reply = cached.length > 0
           ? `📚 未配置 AI，先给你知识库命中结果（${cached.length} 条）：\n${cached.map((m) => `- ${m.title}: ${stripHtml(m.content).slice(0, 60) || '(空)'}`).join('\n')}\n\n去 Settings → AI Providers 配置后，我会给出真实回答。`
           : '✨ 尚未配置 AI 服务商。请在「设置 → AI Providers」填入 apiKey/model 后回来提问。'
         await saveMessage(ctx, convId, 'assistant', reply)
-        return { reply, source: 'fallback', conversationId: convId }
+        return { reply, source: 'fallback', conversationId: convId, sources: sources.map((s) => ({ ...s, score: Math.round(s.score * 1000) / 1000 })) }
       }
 
       const contextBlock = input.noteContext
@@ -131,7 +134,7 @@ export const aiRouter = router({
             { role: 'system', content: `${system}\n\n你有以下可用工具（MCP）：\n${mcpTools.map((t) => `- ${t.name}${t.description ? `：${t.description}` : ''}（${t.server}）`).join('\n')}` },
             ...historyForLlm,
             finalUserMsg,
-          ], mcpTools.map((t) => ({ name: t.name, description: t.description, inputSchema: undefined })))
+          ], mcpTools.map((t) => ({ name: t.name, description: t.description, inputSchema: undefined })), { task: 'chat' })
           if (first.toolCalls?.length) {
             const toolResults = []
             for (const tc of first.toolCalls) {
@@ -149,7 +152,7 @@ export const aiRouter = router({
               ...historyForLlm,
               finalUserMsg,
               ...msgs,
-            ])
+            ], { task: 'chat' })
             source = 'mcp'
           } else {
             reply = first.content || '（模型未返回文字）'
@@ -160,16 +163,16 @@ export const aiRouter = router({
             { role: 'system', content: system },
             ...historyForLlm,
             finalUserMsg,
-          ])
+          ], { task: 'chat' })
           source = 'llm'
         }
 
         await saveMessage(ctx, convId, 'assistant', reply)
-        return { reply, source, conversationId: convId }
+        return { reply, source, conversationId: convId, sources: sources.map((s) => ({ ...s, score: Math.round(s.score * 1000) / 1000 })) }
       } catch (e) {
         const reply = `⚠️ ${e instanceof Error ? e.message : 'AI 调用失败'}`
         await saveMessage(ctx, convId, 'assistant', reply)
-        return { reply, source: 'error', conversationId: convId }
+        return { reply, source: 'error', conversationId: convId, sources: sources.map((s) => ({ ...s, score: Math.round(s.score * 1000) / 1000 })) }
       }
     }),
 
@@ -182,7 +185,7 @@ export const aiRouter = router({
       return llmChatChatCompletions(ctx, [
         { role: 'system', content: '为这段内容生成一句 ≤40 字的中文摘要，只输出摘要本身，不要引号。' },
         { role: 'user', content: clean },
-      ], { maxTokens: 120 })
+      ], { maxTokens: 120, task: 'summary' })
     }),
 
   suggestTags: publicProcedure
@@ -199,7 +202,7 @@ export const aiRouter = router({
       const raw = await llmChatChatCompletions(ctx, [
         { role: 'system', content: '为下面内容推荐 1~3 个中文标签，用顿号分隔，只输出标签本身。' },
         { role: 'user', content: clean },
-      ], { maxTokens: 60 })
+      ], { maxTokens: 60, task: 'tags' })
       const tags = raw.split(/[、,，\s]+/).map((t) => t.replace(/^#/, '').trim()).filter(Boolean).slice(0, 3)
       return tags
     }),

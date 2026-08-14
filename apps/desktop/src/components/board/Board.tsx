@@ -1,8 +1,8 @@
-import { useState } from 'react'
-import { LayoutDashboard, Plus, Check, RotateCcw, GripVertical } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { LayoutDashboard, Plus, Check, RotateCcw, Move, Maximize2 } from 'lucide-react'
 import { Modal, Typography } from '@arco-design/web-react'
 import { useBoardStore } from '../../stores/boardStore'
-import { WIDGET_INFO, type WidgetType } from '../../lib/board'
+import { WIDGET_INFO, type WidgetType, type BoardWidget } from '../../lib/board'
 import UiButton from '../ui/UiButton'
 import TodoWidget from './widgets/TodoWidget'
 import CountdownWidget from './widgets/CountdownWidget'
@@ -13,8 +13,12 @@ import WeeklyWidget from './widgets/WeeklyWidget'
 import ActivityWidget from './widgets/ActivityWidget'
 import QuadrantWidget from './widgets/QuadrantWidget'
 import FeedWidget from './widgets/FeedWidget'
+import QueryWidget from './widgets/QueryWidget'
 
 const { Text } = Typography
+
+const MIN_W = 200
+const MIN_H = 120
 
 function renderWidget(w: { id: string; type: WidgetType; title: string }) {
   switch (w.type) {
@@ -36,18 +40,57 @@ function renderWidget(w: { id: string; type: WidgetType; title: string }) {
       return <QuadrantWidget widgetId={w.id} title={w.title} />
     case 'feed':
       return <FeedWidget widgetId={w.id} title={w.title} />
+    case 'query':
+      return <QueryWidget widgetId={w.id} title={w.title} />
   }
 }
 
 export default function Board() {
-  const { widgets, editing, setEditing, addWidget, moveWidget, resetBoard } = useBoardStore()
-  const [dragging, setDragging] = useState<number | null>(null)
+  const { widgets, editing, setEditing, addWidget, updateLayout, resetBoard } = useBoardStore()
   const [pickOpen, setPickOpen] = useState(false)
+  const dragRef = useRef<{ id: string; mode: 'move' | 'resize'; startX: number; startY: number; orig: { x: number; y: number; w: number; h: number } } | null>(null)
 
-  const swap = (from: number, to: number) => {
-    if (from === to || to < 0 || to >= widgets.length) return
-    moveWidget(from, to)
+  const onPointerDown = (e: React.PointerEvent, w: BoardWidget, mode: 'move' | 'resize') => {
+    if (!editing) return
+    e.preventDefault()
+    e.stopPropagation()
+    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    dragRef.current = {
+      id: w.id,
+      mode,
+      startX: e.clientX,
+      startY: e.clientY,
+      orig: { x: w.x ?? 0, y: w.y ?? 0, w: w.w ?? 300, h: w.h ?? 200 },
+    }
   }
+
+  const onPointerMove = (e: React.PointerEvent, w: BoardWidget) => {
+    const d = dragRef.current
+    if (!d || d.id !== w.id) return
+    const dx = e.clientX - d.startX
+    const dy = e.clientY - d.startY
+    if (d.mode === 'move') {
+      updateLayout(w.id, {
+        x: Math.max(0, d.orig.x + dx),
+        y: Math.max(0, d.orig.y + dy),
+        w: d.orig.w,
+        h: d.orig.h,
+      })
+    } else {
+      updateLayout(w.id, {
+        x: d.orig.x,
+        y: d.orig.y,
+        w: Math.max(MIN_W, d.orig.w + dx),
+        h: Math.max(MIN_H, d.orig.h + dy),
+      })
+    }
+  }
+
+  const onPointerUp = () => {
+    dragRef.current = null
+  }
+
+  const canvasBottom = widgets.reduce((max, w) => Math.max(max, (w.y ?? 0) + (w.h ?? 0)), 0) + 60
 
   return (
     <div>
@@ -70,42 +113,76 @@ export default function Board() {
 
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-          gap: 14,
-          alignItems: 'start',
+          position: 'relative',
+          minHeight: canvasBottom,
+          touchAction: 'none',
         }}
       >
-        {widgets.map((w, i) => (
-          <div
-            key={w.id}
-            draggable={editing}
-            onDragStart={() => setDragging(i)}
-            onDragOver={(e) => {
-              e.preventDefault()
-              if (dragging !== null) swap(dragging, i)
-            }}
-            onDragEnd={() => setDragging(null)}
-            style={{ cursor: editing ? 'grab' : 'default', position: 'relative', gridColumn: w.wide ? '1 / -1' : 'auto' }}
-          >
-            {editing && (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: 8,
-                  left: 8,
-                  zIndex: 3,
-                  color: 'var(--text-3)',
-                  display: 'inline-flex',
-                }}
-                title="拖动排序"
-              >
-                <GripVertical size={13} />
-              </span>
-            )}
-            {renderWidget(w)}
-          </div>
-        ))}
+        {widgets.map((w) => {
+          const x = w.x ?? 0
+          const y = w.y ?? 0
+          const width = w.w ?? 300
+          const height = w.h ?? 200
+          return (
+            <div
+              key={w.id}
+              onPointerMove={(e) => onPointerMove(e, w)}
+              onPointerUp={onPointerUp}
+              style={{
+                position: 'absolute',
+                left: x,
+                top: y,
+                width,
+                height,
+                zIndex: dragRef.current?.id === w.id ? 20 : 1,
+              }}
+            >
+              <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                {renderWidget(w)}
+                {editing && (
+                  <>
+                    <span
+                      onPointerDown={(e) => onPointerDown(e, w, 'move')}
+                      style={{
+                        position: 'absolute',
+                        top: 6,
+                        left: 6,
+                        zIndex: 5,
+                        color: 'var(--text-3)',
+                        cursor: 'move',
+                        display: 'inline-flex',
+                        padding: 2,
+                        background: 'var(--bg-raised)',
+                        borderRadius: 4,
+                      }}
+                      title="拖动移动"
+                    >
+                      <Move size={13} />
+                    </span>
+                    <span
+                      onPointerDown={(e) => onPointerDown(e, w, 'resize')}
+                      style={{
+                        position: 'absolute',
+                        right: 4,
+                        bottom: 4,
+                        zIndex: 5,
+                        color: 'var(--text-3)',
+                        cursor: 'nwse-resize',
+                        display: 'inline-flex',
+                        padding: 2,
+                        background: 'var(--bg-raised)',
+                        borderRadius: 4,
+                      }}
+                      title="拖动调整大小"
+                    >
+                      <Maximize2 size={12} />
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       <Modal visible={pickOpen} onCancel={() => setPickOpen(false)} footer={null} title="添加组件">
@@ -125,7 +202,7 @@ export default function Board() {
               </span>
               <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)' }}>
                 {info.desc}
-                {info.wide ? ' · 整行' : ''}
+                {info.size.w >= 600 ? ' · 整行' : ''}
               </span>
             </div>
           ))}

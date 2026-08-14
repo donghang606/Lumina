@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { notes, collections } from '../db/schema.js'
 import { randomUUID } from 'node:crypto'
 import { eq } from 'drizzle-orm'
+import { collectDocument } from '../lib/collector/index.js'
 
 function stripHtml(s: string) {
   return (s ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
@@ -12,6 +13,7 @@ export interface CollectInput {
   url: string
   title?: string
   content?: string
+  html?: string
   siteName?: string
   favicon?: string
   note?: string
@@ -29,30 +31,29 @@ export async function doCollect(ctx: { db: typeof import('../db/client.js').db }
     return { ok: true, duplicate: true, noteId: existingNote.id }
   }
 
+  // Parse document (HTML → markdown) via the pluggable collector; fall back to raw text
+  const parsed = await collectDocument({ url: input.url, html: input.html, text: input.content })
+  const bodyText = parsed.content
+  const finalTitle = input.title?.trim() || parsed.title || hostOf(input.url)
+
   // Create a bookmark note
   const id = randomUUID()
-  const host = (() => {
-    try {
-      return new URL(input.url).hostname
-    } catch {
-      return input.url
-    }
-  })()
+  const host = hostOf(input.url)
   const body = [
     input.note?.trim() ? `> 备注：${input.note.trim()}` : '',
-    input.content ? stripHtml(input.content) : '',
+    bodyText,
   ].filter(Boolean).join('\n\n')
 
   await ctx.db.insert(notes).values({
     id,
-    title: input.title || host,
+    title: finalTitle,
     content: body,
     type: 'bookmark',
     summary: null,
     status: 'draft',
     meta: {
       sourceUrl: input.url,
-      siteName: input.siteName ?? host,
+      siteName: input.siteName ?? parsed.siteName ?? host,
       favicon: input.favicon ?? null,
     },
     createdAt: now,
@@ -62,16 +63,24 @@ export async function doCollect(ctx: { db: typeof import('../db/client.js').db }
   await ctx.db.insert(collections).values({
     id: randomUUID(),
     url: input.url,
-    title: input.title || host,
-    description: stripHtml(input.content ?? '').slice(0, 240) || null,
-    siteName: input.siteName ?? null,
+    title: finalTitle,
+    description: stripHtml(bodyText).slice(0, 240) || null,
+    siteName: input.siteName ?? parsed.siteName ?? null,
     favicon: input.favicon ?? null,
-    content: input.content,
+    content: bodyText,
     noteId: id,
     collectedAt: now,
   })
 
   return { ok: true, duplicate: false, noteId: id }
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname
+  } catch {
+    return url
+  }
 }
 
 export const extensionRouter = router({
@@ -80,7 +89,8 @@ export const extensionRouter = router({
       z.object({
         url: z.string().url(),
         title: z.string().default(''),
-        content: z.string().default(''),
+        content: z.string().optional(),
+        html: z.string().optional(),
         siteName: z.string().optional(),
         favicon: z.string().optional(),
         note: z.string().optional(),

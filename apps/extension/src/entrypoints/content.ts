@@ -1,6 +1,5 @@
 import { defineContentScript } from 'wxt/sandbox'
 import { browser } from 'wxt/browser'
-import { Readability } from '@mozilla/readability'
 
 export default defineContentScript({
   matches: ['<all_urls>'],
@@ -19,17 +18,14 @@ export default defineContentScript({
         ''
       const favicon = faviconRaw ? new URL(faviconRaw, url).href : null
 
-      let content = ''
-      try {
-        const clone = document.documentElement.cloneNode(true) as Document
-        ;(clone.body as HTMLElement)?.querySelectorAll?.('script,style,noscript,iframe,nav,footer,aside,form').forEach((n) => n.remove())
-        const article = new Readability(clone).parse()
-        content = article?.textContent?.trim() ?? ''
-      } catch {
-        content = document.body?.innerText?.trim() ?? ''
-      }
+      // Send the raw DOM so the server-side collector can extract & convert to markdown.
+      // Also send a plain-text fallback for robustness.
+      const clone = document.documentElement.cloneNode(true) as Document
+      ;(clone as any).querySelectorAll?.('script,style,noscript,iframe,nav,footer,aside,form').forEach((n: any) => n.remove())
+      const html = (clone.documentElement?.outerHTML ?? document.documentElement.outerHTML).slice(0, 2_000_000)
+      const text = document.body?.innerText?.trim() ?? ''
 
-      return { url, title, siteName, favicon, content }
+      return { url, title, siteName, favicon, html, text }
     }
 
     window.__LUMINA_COLLECT__ = collect
@@ -44,6 +40,6 @@ export default defineContentScript({
 
 declare global {
   interface Window {
-    __LUMINA_COLLECT__?: () => { url: string; title: string; siteName: string; favicon: string | null; content: string }
+    __LUMINA_COLLECT__?: () => { url: string; title: string; siteName: string; favicon: string | null; html: string; text: string }
   }
 }

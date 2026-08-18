@@ -18,6 +18,8 @@ export interface Settings {
   sttBaseUrl: string | null
   sttApiKey: string | null
   sttModel: string | null
+  webSearchProvider: 'none' | 'tavily' | 'brave'
+  webSearchApiKey: string | null
 }
 
 function normalizeSettings(s: any): Settings {
@@ -37,6 +39,8 @@ function normalizeSettings(s: any): Settings {
     sttBaseUrl: s.sttBaseUrl ?? null,
     sttApiKey: s.sttApiKey ?? null,
     sttModel: s.sttModel ?? null,
+    webSearchProvider: s.webSearchProvider ?? 'none',
+    webSearchApiKey: s.webSearchApiKey ?? null,
   }
 }
 
@@ -95,5 +99,8 @@ export const configService = {
   },
   async deleteMcpServer(id: string): Promise<{ ok: boolean }> {
     return trpc.config.deleteMcpServer.mutate({ id })
+  },
+  async webSearchNow(query: string): Promise<{ configured: boolean; provider: string; results: { title: string; url: string; snippet: string; score: number }[] }> {
+    return trpc.config.webSearchNow.query({ query })
   },
 }

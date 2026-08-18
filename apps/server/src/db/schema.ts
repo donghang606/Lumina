@@ -103,6 +103,8 @@ export const settings = sqliteTable('settings', {
   sttBaseUrl: text('stt_base_url'),
   sttApiKey: text('stt_api_key'),
   sttModel: text('stt_model'),
+  webSearchProvider: text('web_search_provider', { enum: ['none', 'tavily', 'brave'] }).notNull().default('none'),
+  webSearchApiKey: text('web_search_api_key'),
 })
 
 export const mcpServers = sqliteTable('mcp_servers', {

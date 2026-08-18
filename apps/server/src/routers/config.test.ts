@@ -34,6 +34,8 @@ const DEFAULT_SETTINGS = {
   sttBaseUrl: null,
   sttApiKey: null,
   sttModel: null,
+  webSearchProvider: 'none',
+  webSearchApiKey: null,
 }
 
 describe('configRouter', () => {
@@ -141,6 +143,17 @@ describe('configRouter', () => {
       const caller = configRouter.createCaller({ db: db as any, req: {} as any, res: {} as any })
       const result = await caller.listMcpServers()
       expect(result).toEqual([])
+    })
+  })
+
+  describe('webSearchNow', () => {
+    it('reports unconfigured when provider none', async () => {
+      const db = createMockDb()
+      db.get.mockReturnValue({ ...DEFAULT_SETTINGS, webSearchProvider: 'none', webSearchApiKey: null })
+      const caller = configRouter.createCaller({ db: db as any, req: {} as any, res: {} as any })
+      const result = await caller.webSearchNow({ query: 'hello' })
+      expect(result.configured).toBe(false)
+      expect(result.results).toEqual([])
     })
   })
 })

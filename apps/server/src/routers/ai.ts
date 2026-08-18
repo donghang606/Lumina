@@ -1,9 +1,11 @@
 import { router, publicProcedure, type Context } from '../trpc/context.js'
 import { z } from 'zod'
-import { notes, noteBlocks, conversations, messages } from '../db/schema.js'
+import { notes, noteBlocks, conversations, messages, settings as settingsTable } from '../db/schema.js'
 import { like, or, eq, desc, asc, sql } from 'drizzle-orm'
 import { llmChatChatCompletions, llmChatChatCompletionsTools, getActiveProvider } from '../llm/provider.js'
 import { listMcpTools, callMcpTool } from '../mcp/runner.js'
+import { webSearch, renderWebResults } from '../lib/webSearch.js'
+import { decryptSecret } from '../lib/secrets.js'
 
 const uuid = () => crypto.randomUUID()
 
@@ -111,6 +113,22 @@ export const aiRouter = router({
           ? `知识库相关内容（供参考）：\n${cached.map((m) => `- [${m.title}] ${stripHtml(m.content).slice(0, 300)}`).join('\n')}`
           : '当前知识库没有直接相关的内容。'
 
+      // 网页搜索增强：配置了 web search 时，联网补充实时信息（失败静默降级）
+      let webContext = ''
+      try {
+        const row = await ctx.db.select().from(settingsTable).limit(1).get()
+        const cfg = {
+          provider: ((row as any)?.webSearchProvider ?? 'none') as 'none' | 'tavily' | 'brave',
+          apiKey: (row as any)?.webSearchApiKey ? decryptSecret((row as any).webSearchApiKey) : null,
+        }
+        if (cfg.provider !== 'none' && cfg.apiKey) {
+          const hits = await webSearch(cfg, q, 4)
+          if (hits.length > 0) webContext = `\n\n联网搜索结果（供参考，注意时效性）：\n${renderWebResults(hits)}`
+        }
+      } catch {
+        webContext = ''
+      }
+
       const historyForLlm: { role: 'user' | 'assistant'; content: string }[] = history
         .filter((m) => m.role === 'user' || m.role === 'assistant')
         .slice(-12, -1)
@@ -125,7 +143,7 @@ export const aiRouter = router({
           /* ignore */
         }
         const system = '你是 Lumina——一个本地优先的个人知识助手。回答简洁、中文、有结构；引用知识库时说明你的判断依据。不要编造笔记中不存在的事实。'
-        const finalUserMsg = { role: 'user' as const, content: `${contextBlock}\n\n用户问题：${q}` }
+        const finalUserMsg = { role: 'user' as const, content: `${contextBlock}${webContext}\n\n用户问题：${q}` }
 
         let reply: string
         let source: string

@@ -82,7 +82,9 @@ export async function initDb(c = client) {
     auto_classify INTEGER NOT NULL DEFAULT 0,
     default_provider_id TEXT, default_model TEXT, server_url TEXT,
     stt_enabled INTEGER NOT NULL DEFAULT 0, stt_base_url TEXT,
-    stt_api_key TEXT, stt_model TEXT
+    stt_api_key TEXT, stt_model TEXT,
+    web_search_provider TEXT NOT NULL DEFAULT 'none',
+    web_search_api_key TEXT
   )`)
 
   await migrateSettingsColumns(sql)
@@ -153,6 +155,8 @@ async function migrateSettingsColumns(sql: ReturnType<typeof createClient>) {
     `ALTER TABLE settings ADD COLUMN stt_api_key TEXT`,
     `ALTER TABLE settings ADD COLUMN stt_model TEXT`,
     `ALTER TABLE settings ADD COLUMN task_models TEXT NOT NULL DEFAULT '{}'`,
+    `ALTER TABLE settings ADD COLUMN web_search_provider TEXT NOT NULL DEFAULT 'none'`,
+    `ALTER TABLE settings ADD COLUMN web_search_api_key TEXT`,
   ]) {
     try {
       await sql.execute(stmt)

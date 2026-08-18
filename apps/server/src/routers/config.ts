@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { disposeMcp } from '../mcp/runner.js'
 import { encryptSecret, decryptSecret, maskSecret } from '../lib/secrets.js'
+import { webSearch, type WebSearchConfig } from '../lib/webSearch.js'
 
 const DEFAULT_SETTINGS_ID = 'main'
 
@@ -37,12 +38,15 @@ export const configRouter = router({
         sttBaseUrl: null,
         sttApiKey: null,
         sttModel: null,
+        webSearchProvider: 'none' as const,
+        webSearchApiKey: null,
       }
       await ctx.db.insert(settings).values(row).run()
     }
     return {
       ...row,
       sttApiKey: row.sttApiKey ? maskSecret(decryptSecret(row.sttApiKey)) : null,
+      webSearchApiKey: row.webSearchApiKey ? maskSecret(decryptSecret(row.webSearchApiKey)) : null,
     }
   }),
 
@@ -63,14 +67,19 @@ export const configRouter = router({
         sttBaseUrl: z.string().nullable().optional(),
         sttApiKey: z.string().nullable().optional(),
         sttModel: z.string().nullable().optional(),
+        webSearchProvider: z.enum(['none', 'tavily', 'brave']).optional(),
+        webSearchApiKey: z.string().nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const { sttApiKey, ...rest } = input
+      const { sttApiKey, webSearchApiKey, ...rest } = input
       const current = await ctx.db.select().from(settings).where(eq(settings.id, DEFAULT_SETTINGS_ID)).get()
       const payload: Record<string, unknown> = { ...rest }
       if (sttApiKey !== undefined) {
         payload.sttApiKey = resolveApiKey(current?.sttApiKey, sttApiKey)
+      }
+      if (webSearchApiKey !== undefined) {
+        payload.webSearchApiKey = resolveApiKey(current?.webSearchApiKey, webSearchApiKey)
       }
       await ctx.db
         .update(settings)
@@ -81,6 +90,7 @@ export const configRouter = router({
       return {
         ...saved,
         sttApiKey: saved?.sttApiKey ? maskSecret(decryptSecret(saved.sttApiKey)) : null,
+        webSearchApiKey: saved?.webSearchApiKey ? maskSecret(decryptSecret(saved.webSearchApiKey)) : null,
       }
     }),
 
@@ -182,4 +192,16 @@ export const configRouter = router({
     await disposeMcp()
     return { ok: true }
   }),
+
+  webSearchNow: publicProcedure
+    .input(z.object({ query: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      const row = await ctx.db.select().from(settings).where(eq(settings.id, DEFAULT_SETTINGS_ID)).get()
+      const cfg: WebSearchConfig = {
+        provider: (row?.webSearchProvider as WebSearchConfig['provider']) ?? 'none',
+        apiKey: row?.webSearchApiKey ? decryptSecret(row.webSearchApiKey) : null,
+      }
+      const results = await webSearch(cfg, input.query, 5)
+      return { configured: cfg.provider !== 'none' && !!cfg.apiKey, provider: cfg.provider, results }
+    }),
 })

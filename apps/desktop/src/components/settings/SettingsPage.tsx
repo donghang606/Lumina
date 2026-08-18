@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Typography, Form, Input, Select, Switch, Button, Tabs, Table, Message, Space, Modal, Tag } from '@arco-design/web-react'
-import { Settings as SettingsIcon, Plus, Zap, Server, Palette, Sparkles, BrainCircuit, RefreshCw, Trash2, Database, Mic } from 'lucide-react'
+import { Settings as SettingsIcon, Plus, Zap, Server, Palette, Sparkles, BrainCircuit, RefreshCw, Trash2, Database, Mic, Globe } from 'lucide-react'
 import { configService } from '../../services/configService'
 import { aiService } from '../../services/aiService'
 import { noteService } from '../../services/noteService'
@@ -42,6 +42,12 @@ export default function SettingsPage() {
   const [serverUrlLocal, setServerUrlLocal] = useState(getServerUrlRaw)
   const [sttEnabled, setSttEnabled] = useState(false)
   const [sttBaseUrl, setSttBaseUrl] = useState('')
+  const [webSearchProvider, setWebSearchProvider] = useState<'none' | 'tavily' | 'brave'>('none')
+  const [webSearchApiKey, setWebSearchApiKey] = useState('')
+  const [webSearchSavedKey, setWebSearchSavedKey] = useState('')
+  const [webSearchTest, setWebSearchTest] = useState<{ configured: boolean; provider: string; results: { title: string; url: string; snippet: string }[] } | null>(null)
+  const [testingWeb, setTestingWeb] = useState(false)
+  const [savingWeb, setSavingWeb] = useState(false)
   const [sttApiKey, setSttApiKey] = useState('')
   const [sttModel, setSttModel] = useState('')
   const [sttSavedKey, setSttSavedKey] = useState('')
@@ -131,6 +137,8 @@ export default function SettingsPage() {
           setSttSavedKey(s.sttApiKey ?? '')
           setSttModel(s.sttModel ?? '')
           setTaskModels(s.taskModels ?? {})
+          setWebSearchProvider(s.webSearchProvider ?? 'none')
+          setWebSearchSavedKey(s.webSearchApiKey ?? '')
         }
         setProviders(p)
         setMcps(m)
@@ -241,6 +249,39 @@ export default function SettingsPage() {
       Message.error('保存失败，请确认服务端已启动')
     } finally {
       setSavingStt(false)
+    }
+  }
+
+  const saveWebSearch = async () => {
+    setSavingWeb(true)
+    try {
+      const saved = await configService.updateSettings({
+        webSearchProvider,
+        webSearchApiKey: webSearchApiKey.trim() || null,
+      })
+      if (saved) {
+        setWebSearchSavedKey(saved.webSearchApiKey ?? '')
+        setWebSearchApiKey('')
+        Message.success('联网搜索配置已保存')
+      }
+    } catch {
+      Message.error('保存失败，请确认服务端已启动')
+    } finally {
+      setSavingWeb(false)
+    }
+  }
+
+  const testWebSearch = async () => {
+    setTestingWeb(true)
+    setWebSearchTest(null)
+    try {
+      const r = await configService.webSearchNow('Lumina 笔记应用')
+      setWebSearchTest(r)
+      if (!r.configured) Message.warning('尚未配置联网搜索，先在下方选择服务商并填入 API Key')
+    } catch {
+      Message.error('测试失败，请确认服务端已启动')
+    } finally {
+      setTestingWeb(false)
     }
   }
 
@@ -540,6 +581,62 @@ export default function SettingsPage() {
                 对接 OpenAI 兼容 <code>/audio/transcriptions</code> 端点的服务商即可（Groq / OpenAI / 自建 whisper.cpp 等）。未启用独立 STT 时，沿用默认 Provider 的 baseUrl，模型名含 whisper/transcribe/audio/stt/speech 时使用，否则回退 whisper-1。
               </p>
             </div>
+          </Glass>
+
+          <Glass style={{ padding: 'var(--sp-5)', marginTop: 'var(--sp-4)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--sp-4)' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Globe size={13} color="var(--accent)" />
+                <span className="lumina-label">联网搜索（Web Search）</span>
+              </div>
+              <Space>
+                <Button size="small" loading={testingWeb} onClick={() => void testWebSearch()}>
+                  测试搜索
+                </Button>
+                <Button size="small" type="primary" loading={savingWeb} onClick={() => void saveWebSearch()}>
+                  保存
+                </Button>
+              </Space>
+            </div>
+            <div style={{ display: 'flex', gap: 'var(--sp-3)', flexWrap: 'wrap', marginBottom: 'var(--sp-3)' }}>
+              <FormItem label="服务商" style={{ marginBottom: 'var(--sp-2)', minWidth: 200 }}>
+                <Select
+                  value={webSearchProvider}
+                  onChange={setWebSearchProvider}
+                  style={{ maxWidth: 260 }}
+                >
+                  <Select.Option value="none">关闭</Select.Option>
+                  <Select.Option value="tavily">Tavily</Select.Option>
+                  <Select.Option value="brave">Brave Search</Select.Option>
+                </Select>
+              </FormItem>
+              <FormItem label="API Key" style={{ marginBottom: 'var(--sp-2)', minWidth: 300, flex: 1 }}>
+                <Input.Password
+                  value={webSearchApiKey}
+                  onChange={setWebSearchApiKey}
+                  placeholder={webSearchSavedKey ? `已保存密钥 ${webSearchSavedKey}，留空保持不变` : '粘贴 API Key'}
+                  style={{ maxWidth: 420 }}
+                />
+              </FormItem>
+            </div>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', lineHeight: 1.7 }}>
+              <p style={{ margin: 0 }}>
+                配置后，AI 问答会自动联网补充实时信息（搜索失败静默降级，不影响本地知识库回答）。Tavily 推荐：<code>https://app.tavily.com</code> 免费注册获取 Key；Brave：<code>https://brave.com/search/api/</code>。
+              </p>
+            </div>
+            {webSearchTest && (
+              <div style={{ marginTop: 'var(--sp-3)', fontSize: 'var(--text-sm)' }}>
+                <Text style={{ color: 'var(--text-2)' }}>
+                  {webSearchTest.configured ? `已配置 ${webSearchTest.provider}，命中 ${webSearchTest.results.length} 条` : '未配置，请先填写服务商与 Key'}
+                </Text>
+                {webSearchTest.results.slice(0, 3).map((r) => (
+                  <div key={r.url} style={{ marginTop: 6, padding: 'var(--sp-2)', background: 'var(--bg-raised)', borderRadius: 6 }}>
+                    <a href={r.url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>{r.title}</a>
+                    <div style={{ color: 'var(--text-3)', marginTop: 2 }}>{r.snippet.slice(0, 120)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </Glass>
         </Tabs.TabPane>
 

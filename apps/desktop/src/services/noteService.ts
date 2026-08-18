@@ -32,10 +32,10 @@ export const noteService = {
   async getBacklinks(noteId: string): Promise<{ id: string; title: string }[]> {
     return trpc.note.getBacklinks.query({ noteId })
   },
-  async search(keyword: string): Promise<{ id: string; title: string }[]> {
+  async search(keyword: string): Promise<{ id: string; title: string; snippet?: string; score?: number }[]> {
     if (!keyword.trim()) return []
     const res = await trpc.note.search.query({ query: keyword, limit: 8 })
-    return res.items.map((i) => ({ id: i.id, title: i.title }))
+    return res.items.map((i) => ({ id: i.id, title: i.title, snippet: i.snippet, score: i.score }))
   },
   async related(noteId: string, limit?: number): Promise<RelatedNote[]> {
     const res = await trpc.note.related.query({ noteId, limit: limit ?? 5 })

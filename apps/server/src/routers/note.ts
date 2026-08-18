@@ -4,6 +4,7 @@ import { notes, noteLinks, tagsOnNotes, tags, noteBlocks, blockRefs, noteTombsto
 import { randomUUID } from 'node:crypto'
 import { eq, or, sql, desc, inArray } from 'drizzle-orm'
 import { embedTexts, cosineSimilarity, getActiveProvider } from '../llm/provider.js'
+import { bm25Score, fuseRanks, rankByScores, type SearchableDoc } from '../lib/hybridSearch.js'
 
 const noteUpdateSchema = z.object({
   id: z.string(),
@@ -422,34 +423,31 @@ export const noteRouter = router({
   }),
 
   search: publicProcedure
-    .input(z.object({ query: z.string().min(1).max(500), limit: z.number().int().min(1).max(10).default(5) }))
+    .input(z.object({ query: z.string().min(1).max(500), limit: z.number().int().min(1).max(20).default(8) }))
     .query(async ({ ctx, input }) => {
       const p = await getActiveProvider(ctx)
       const rows = await ctx.db.select().from(notes).all()
+      const docs = rows.map((n) => ({ id: n.id, title: n.title, content: n.content ?? '' }))
 
-      // keyword fallback (always available)
-      const kw = input.query
-      const kwMatches = rows
-        .map((n) => {
-          const hay = `${n.title ?? ''} ${n.content ?? ''}`.toLowerCase()
-          let score = 0
-          for (const w of kw.toLowerCase().split(/\s+/)) {
-            if (w && hay.includes(w)) score += w.length
-          }
-          return score > 0 ? { id: n.id, title: n.title, content: n.content, score } : null
-        })
-        .filter((x): x is NonNullable<typeof x> => x !== null)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, input.limit)
+      // BM25 关键词检索（纯本地，始终可用）
+      const bm25Hits = bm25Score(input.query, docs)
+      const kwMatches = bm25Hits.slice(0, input.limit)
 
       if (!p.ready) {
         return {
-          source: 'keyword' as const,
-          items: kwMatches.map((m) => ({ id: m.id, title: m.title, snippet: stripNote(m.content), score: m.score })),
+          source: 'hybrid' as const,
+          items: kwMatches.map((m) => ({
+            id: m.id,
+            title: m.title,
+            snippet: stripNote(docs.find((d) => d.id === m.id)?.content ?? ''),
+            score: m.bm25,
+          })),
         }
       }
 
-      // semantic
+      // 语义向量检索
+      let semanticRank = new Map<string, number>()
+      let semanticScores = new Map<string, number>()
       try {
         const blocks = await ctx.db.select().from(noteBlocks).all()
         const vector = (await embedTexts(ctx, [input.query], { task: 'embed' }))[0]
@@ -469,20 +467,34 @@ export const noteRouter = router({
         scored.sort((a, b) => b.sim - a.sim)
 
         const threshold = Math.max(0.15, (scored[0]?.sim ?? 0) * 0.6)
-        const semanticHits = scored.filter((s) => s.sim >= threshold).slice(0, input.limit)
-
-        if (semanticHits.length > 0) {
-          return {
-            source: 'semantic' as const,
-            items: semanticHits.map((s) => ({ id: s.noteId, title: s.title, snippet: s.chunkContent, score: Math.round(s.sim * 1000) / 1000 })),
-          }
+        const above = scored.filter((s) => s.sim >= threshold)
+        const perNote = new Map<string, { noteId: string; chunkContent: string; sim: number }>()
+        for (const s of above) {
+          const cur = perNote.get(s.noteId)
+          if (!cur || s.sim > cur.sim) perNote.set(s.noteId, s)
         }
+        const noteScores = [...perNote.values()]
+        const topBySim = [...noteScores].sort((a, b) => b.sim - a.sim)
+        semanticRank = rankByScores(topBySim, (s) => s.sim)
+        for (const s of noteScores) semanticScores.set(s.noteId, s.sim)
       } catch {
-        // fall through to keyword
+        // 语义不可用时退回纯 BM25
       }
+
+      // RRF 融合 BM25 与语义排名
+      const fused = fuseRanks(bm25Hits, semanticRank, semanticScores).slice(0, input.limit)
+
+      const snippetOf = (id: string, d: SearchableDoc | undefined, fallback: string) =>
+        d ? stripNote(d.content) : fallback
+
       return {
-        source: 'keyword' as const,
-        items: kwMatches.map((m) => ({ id: m.id, title: m.title, snippet: stripNote(m.content), score: m.score })),
+        source: 'hybrid' as const,
+        items: fused.map((f) => ({
+          id: f.id,
+          title: f.title,
+          snippet: snippetOf(f.id, docs.find((d) => d.id === f.id), f.snippet),
+          score: Math.round(f.score * 1000) / 1000,
+        })),
       }
     }),
 

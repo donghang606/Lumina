@@ -77,7 +77,7 @@ export default function SearchBar() {
 
     if (isSearch) {
       const notes = await noteService.search(q)
-      for (const n of notes) opts.push({ type: 'note', id: n.id, label: n.title || '(无标题)', sub: '打开笔记' })
+      for (const n of notes) opts.push({ type: 'note', id: n.id, label: n.title || '(无标题)', sub: n.snippet || '打开笔记' })
       opts.push({ type: 'action', label: `搜索笔记「${q}」`, sub: '回车执行' })
     } else if (q.trim().length > 0 && q !== '@') {
       const tags = await tagService.list()

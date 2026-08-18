@@ -120,8 +120,15 @@ const FLOW_COLS = 2
 
 /** v2（仅 wide）→ v3（自由画布 x/y/w/h）迁移：按行流式排布 */
 export function migrateToCanvas(widgets: BoardWidget[], force = false): BoardWidget[] {
+  // 不强制重排时：已定位的组件保留原位，缺失坐标的组件从「已定位组件下方」开始流式排布，避免与既有组件重叠
+  const baseY = force
+    ? 0
+    : widgets.reduce((max, w) => {
+        if (w.x === undefined || w.y === undefined || w.w === undefined || w.h === undefined) return max
+        return Math.max(max, w.y + w.h)
+      }, 0)
   let cursorX = 0
-  let cursorY = 0
+  let cursorY = baseY
   let rowMaxH = 0
   return widgets.map((w) => {
     if (!force && w.x !== undefined && w.y !== undefined && w.w !== undefined && w.h !== undefined) return w

@@ -35,7 +35,8 @@ function load(): BoardWidget[] {
       const cleansed = stripObsolete(parsed)
       if (cleansed.length !== parsed.length) persist(cleansed)
       if (cleansed.length === 0) return buildDefaultBoard()
-      if (widgetsOverlap(cleansed)) {
+      const missingCoords = cleansed.some((w) => w.x === undefined || w.y === undefined || w.w === undefined || w.h === undefined)
+      if (missingCoords || widgetsOverlap(cleansed)) {
         const relaid = stripObsolete(migrateToCanvas(cleansed, true))
         persist(relaid)
         return relaid

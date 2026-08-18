@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { LayoutDashboard, Plus, Check, RotateCcw, Move, Maximize2 } from 'lucide-react'
 import { Modal, Typography } from '@arco-design/web-react'
 import { useBoardStore } from '../../stores/boardStore'
-import { WIDGET_INFO, type WidgetType, type BoardWidget } from '../../lib/board'
+import { WIDGET_INFO, widgetsOverlap, migrateToCanvas, type WidgetType, type BoardWidget } from '../../lib/board'
 import UiButton from '../ui/UiButton'
 import TodoWidget from './widgets/TodoWidget'
 import CountdownWidget from './widgets/CountdownWidget'
@@ -46,9 +46,22 @@ function renderWidget(w: { id: string; type: WidgetType; title: string }) {
 }
 
 export default function Board() {
-  const { widgets, editing, setEditing, addWidget, updateLayout, resetBoard } = useBoardStore()
+  const { widgets, editing, setEditing, addWidget, updateLayout, resetBoard, updateWidget } = useBoardStore()
   const [pickOpen, setPickOpen] = useState(false)
   const dragRef = useRef<{ id: string; mode: 'move' | 'resize'; startX: number; startY: number; orig: { x: number; y: number; w: number; h: number } } | null>(null)
+  const healedRef = useRef(false)
+
+  // 挂载自愈：若已持久化的看板仍重叠或缺坐标，强制重排一次并写回
+  if (!healedRef.current) {
+    healedRef.current = true
+    const needHeal =
+      widgets.length > 0 &&
+      (widgetsOverlap(widgets) || widgets.some((w) => w.x === undefined || w.y === undefined || w.w === undefined || w.h === undefined))
+    if (needHeal) {
+      const relaid = migrateToCanvas(widgets, true)
+      relaid.forEach((w) => updateWidget(w.id, { x: w.x, y: w.y, w: w.w, h: w.h }))
+    }
+  }
 
   const onPointerDown = (e: React.PointerEvent, w: BoardWidget, mode: 'move' | 'resize') => {
     if (!editing) return

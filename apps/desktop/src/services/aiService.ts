@@ -51,6 +51,9 @@ export const aiService = {
   async summarize(text: string): Promise<string> {
     return trpc.ai.summarize.mutate({ text })
   },
+  async transform(text: string, mode: 'polish' | 'rewrite' | 'translate' | 'shorten' | 'expand', targetLang?: string): Promise<string> {
+    return trpc.ai.transform.mutate({ text, mode, targetLang })
+  },
   async suggestTags(title: string, text: string): Promise<string[]> {
     return trpc.ai.suggestTags.mutate({ title, text })
   },

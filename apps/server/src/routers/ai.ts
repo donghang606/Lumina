@@ -206,6 +206,31 @@ export const aiRouter = router({
       ], { maxTokens: 120, task: 'summary' })
     }),
 
+  transform: publicProcedure
+    .input(
+      z.object({
+        text: z.string().min(1).max(20000),
+        mode: z.enum(['polish', 'rewrite', 'translate', 'shorten', 'expand']),
+        targetLang: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const p = await getActiveProvider(ctx)
+      if (!p.ready) throw new Error(p.reason)
+      const clean = stripHtml(input.text).slice(0, 6000)
+      const PROMPTS: Record<string, string> = {
+        polish: '润色以下文本：保持原意与语气，修正错别字和病句，让表达更流畅自然。只输出润色后的文本。',
+        rewrite: '改写以下文本：保留核心信息，用更清晰、有感染力的方式重新表达。只输出改写后的文本。',
+        translate: `把以下文本翻译成${input.targetLang || '中文'}，保持原意与格式。只输出译文。`,
+        shorten: '把以下文本压缩到一半以内，保留关键信息。只输出压缩后的文本。',
+        expand: '扩写以下文本：补充细节与示例，使其更充实完整，保持原有结构。只输出扩写后的文本。',
+      }
+      return llmChatChatCompletions(ctx, [
+        { role: 'system', content: PROMPTS[input.mode] },
+        { role: 'user', content: clean },
+      ], { task: 'chat' })
+    }),
+
   suggestTags: publicProcedure
     .input(z.object({ title: z.string().max(200), text: z.string().max(20000), existing: z.array(z.string()).default([]) }))
     .mutation(async ({ ctx, input }) => {

@@ -19,10 +19,17 @@ import {
   Link2,
   Trash2,
   Check,
+  Sparkles,
+  Wand2,
+  Languages,
+  Shrink,
+  Expand,
+  Loader2,
 } from 'lucide-react'
 import { useNoteStore } from '../../stores/noteStore'
 import { NoteLinker } from '../../extensions/NoteLinker'
 import { noteService } from '../../services/noteService'
+import { aiService } from '../../services/aiService'
 
 const { Text } = Typography
 
@@ -114,6 +121,43 @@ export default function NoteEditor({ noteId, title, content, onTitleChange, onCo
     hideTimer.current = setTimeout(() => setPreview(null), 250)
   }
 
+  const [aiBusy, setAiBusy] = useState<string | null>(null)
+
+  const runAiTransform = async (mode: 'polish' | 'rewrite' | 'translate' | 'shorten' | 'expand') => {
+    if (!editor || aiBusy) return
+    const { from, to, empty } = editor.state.selection
+    if (empty) {
+      window.alert('请先选中要处理的文本')
+      return
+    }
+    const selected = editor.state.doc.textBetween(from, to, '\n')
+    if (!selected.trim()) return
+    setAiBusy(mode)
+    try {
+      let targetLang: string | undefined
+      if (mode === 'translate') {
+        const input = window.prompt('翻译目标语言（默认中文）', '中文')
+        if (input === null) return
+        targetLang = input.trim() || '中文'
+      }
+      const result = await aiService.transform(selected, mode, targetLang)
+      editor.chain().focus().deleteRange({ from, to }).insertContent(result).run()
+      onContentChange(editor.getMarkdown())
+    } catch (e) {
+      window.alert(`AI 处理失败：${e instanceof Error ? e.message : '未知错误'}`)
+    } finally {
+      setAiBusy(null)
+    }
+  }
+
+  const AI_TOOLS: { Icon: typeof Wand2; title: string; mode: 'polish' | 'rewrite' | 'translate' | 'shorten' | 'expand' }[] = [
+    { Icon: Sparkles, title: '润色', mode: 'polish' },
+    { Icon: Wand2, title: '改写', mode: 'rewrite' },
+    { Icon: Languages, title: '翻译', mode: 'translate' },
+    { Icon: Shrink, title: '精简', mode: 'shorten' },
+    { Icon: Expand, title: '扩写', mode: 'expand' },
+  ]
+
   const setLink = () => {
     if (!editor) return
     const prev = editor.getAttributes('link').href as string | undefined
@@ -167,6 +211,23 @@ export default function NoteEditor({ noteId, title, content, onTitleChange, onCo
             onClick={run}
           >
             <Icon size={15} />
+          </button>
+        ))}
+      </div>
+
+      {/* AI 工具栏 */}
+      <div style={{ padding: '4px var(--sp-4)', borderBottom: '1px solid var(--glass-border)', display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', marginRight: 4 }}>AI</span>
+        {AI_TOOLS.map(({ Icon, title, mode }) => (
+          <button
+            key={mode}
+            title={`${title}（需选中文本）`}
+            className="lumina-tool"
+            disabled={!!aiBusy}
+            style={{ color: aiBusy === mode ? 'var(--accent)' : 'var(--text-2)' }}
+            onClick={() => void runAiTransform(mode)}
+          >
+            {aiBusy === mode ? <Loader2 size={15} className="lumina-spin" /> : <Icon size={15} />}
           </button>
         ))}
       </div>

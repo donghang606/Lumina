@@ -458,6 +458,19 @@ h1, h2, h3, .display {
 .lumina-tool:hover {
   background: var(--glass-hi);
 }
+.lumina-tool:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.lumina-spin {
+  animation: lumina-rotate 0.9s linear infinite;
+}
+@keyframes lumina-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 .lumina-editor-title {
   width: 100%;

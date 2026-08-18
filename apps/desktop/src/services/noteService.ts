@@ -83,6 +83,9 @@ export const tagService = {
   async setParent(id: string, parentId: string | null): Promise<{ ok: boolean; reason?: string }> {
     return trpc.tag.setParent.mutate({ id, parentId })
   },
+  async reorder(id: string, parentId: string | null, beforeId: string | null): Promise<{ ok: boolean; reason?: string }> {
+    return trpc.tag.reorder.mutate({ id, parentId, beforeId })
+  },
 }
 
 export type { Tag }

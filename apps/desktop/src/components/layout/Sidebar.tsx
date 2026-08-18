@@ -55,6 +55,16 @@ export default function Sidebar() {
     }
     return map
   }, [tags])
+  const siblingsOf = useMemo(() => {
+    const map = new Map<string | null, typeof tags>()
+    for (const t of tags) {
+      const key = t.parentId
+      const list = map.get(key) ?? []
+      list.push(t)
+      map.set(key, list)
+    }
+    return map
+  }, [tags])
 
   const onAddTag = async () => {
     const name = newTagName.trim()
@@ -107,9 +117,20 @@ export default function Sidebar() {
           onDrop={(e) => {
             e.preventDefault()
             if (dragId && dragId !== t.id) {
+              const rect = e.currentTarget.getBoundingClientRect()
+              const ratio = (e.clientY - rect.top) / rect.height
               void (async () => {
-                await tagService.setParent(dragId, t.id)
-                setExpanded((s) => ({ ...s, [t.id]: true }))
+                if (ratio < 0.25) {
+                  await tagService.reorder(dragId, t.parentId, t.id)
+                } else if (ratio > 0.75) {
+                  const siblings = siblingsOf.get(t.parentId) ?? []
+                  const idx = siblings.findIndex((s) => s.id === t.id)
+                  const afterId = idx >= 0 && idx < siblings.length - 1 ? siblings[idx + 1].id : null
+                  await tagService.reorder(dragId, t.parentId, afterId)
+                } else {
+                  await tagService.setParent(dragId, t.id)
+                  setExpanded((s) => ({ ...s, [t.id]: true }))
+                }
                 await loadTags()
               })()
             }

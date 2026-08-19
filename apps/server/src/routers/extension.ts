@@ -1,7 +1,7 @@
 import { router, publicProcedure } from '../trpc/context.js'
 import { z } from 'zod'
-import { notes, collections } from '../db/schema.js'
-import { randomUUID } from 'node:crypto'
+import { notes, collections, tags, tagsOnNotes } from '../db/schema.js'
+import { randomUUID, createHash } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { collectDocument } from '../lib/collector/index.js'
 
@@ -17,12 +17,21 @@ export interface CollectInput {
   siteName?: string
   favicon?: string
   note?: string
+  tag?: string
+  summary?: boolean
 }
 
 export async function doCollect(ctx: { db: typeof import('../db/client.js').db }, input: CollectInput): Promise<{ ok: boolean; duplicate: boolean; noteId: string }> {
   const now = new Date().toISOString()
 
-  // Dedupe: same URL already collected?
+  // Parse document (HTML → markdown) via the pluggable collector; fall back to raw text
+  const parsed = await collectDocument({ url: input.url, html: input.html, text: input.content })
+  const bodyText = parsed.content
+  const finalTitle = input.title?.trim() || parsed.title || hostOf(input.url)
+
+  // 内容指纹去重：同 URL 或内容 hash 命中即视为重复（KnowMe 借鉴）
+  const contentHash = createHash('md5').update(bodyText || '').digest('hex')
+
   const existing = await ctx.db.select({ noteId: collections.noteId }).from(collections).where(eq(collections.url, input.url)).get()
   const existingNote = existing?.noteId
     ? await ctx.db.select().from(notes).where(eq(notes.id, existing.noteId)).get()
@@ -31,10 +40,15 @@ export async function doCollect(ctx: { db: typeof import('../db/client.js').db }
     return { ok: true, duplicate: true, noteId: existingNote.id }
   }
 
-  // Parse document (HTML → markdown) via the pluggable collector; fall back to raw text
-  const parsed = await collectDocument({ url: input.url, html: input.html, text: input.content })
-  const bodyText = parsed.content
-  const finalTitle = input.title?.trim() || parsed.title || hostOf(input.url)
+  if (bodyText) {
+    const dupByHash = await ctx.db.select({ noteId: collections.noteId }).from(collections).where(eq(collections.contentHash, contentHash)).get()
+    const dupNote = dupByHash?.noteId
+      ? await ctx.db.select().from(notes).where(eq(notes.id, dupByHash.noteId)).get()
+      : null
+    if (dupNote) {
+      return { ok: true, duplicate: true, noteId: dupNote.id }
+    }
+  }
 
   // Create a bookmark note
   const id = randomUUID()
@@ -68,11 +82,49 @@ export async function doCollect(ctx: { db: typeof import('../db/client.js').db }
     siteName: input.siteName ?? parsed.siteName ?? null,
     favicon: input.favicon ?? null,
     content: bodyText,
+    contentHash,
     noteId: id,
     collectedAt: now,
   })
 
+  if (input.tag) {
+    await assignDefaultTag(ctx, id, input.tag)
+  }
+
+  if (input.summary) {
+    await generateSummary(ctx, id, finalTitle, bodyText)
+  }
+
   return { ok: true, duplicate: false, noteId: id }
+}
+
+async function assignDefaultTag(ctx: { db: typeof import('../db/client.js').db }, noteId: string, name: string) {
+  const slug = name.toLowerCase().trim().replace(/\s+/g, '-')
+  const existing = await ctx.db.select().from(tags).where(eq(tags.slug, slug)).get()
+  const tagId = existing?.id ?? randomUUID()
+  if (!existing) {
+    await ctx.db.insert(tags).values({ id: tagId, name: name.trim(), slug, createdAt: new Date().toISOString() }).run()
+  }
+  await ctx.db.insert(tagsOnNotes).values({ noteId, tagId, assignedBy: 'manual' }).onConflictDoNothing().run()
+}
+
+async function generateSummary(ctx: { db: typeof import('../db/client.js').db }, noteId: string, title: string, content: string) {
+  try {
+    const clean = stripHtml(content).slice(0, 2000)
+    if (!clean) return
+    const { getActiveProvider, llmChatChatCompletions } = await import('../llm/provider.js')
+    const p = await getActiveProvider(ctx as any)
+    if (!p.ready) return
+    const summary = await llmChatChatCompletions(ctx as any, [
+      { role: 'system', content: '为内容生成一句 ≤30字 中文摘要，只输出摘要。' },
+      { role: 'user', content: `${title}\n${clean}` },
+    ], { maxTokens: 80 })
+    if (summary) {
+      await ctx.db.update(notes).set({ summary }).where(eq(notes.id, noteId)).run()
+    }
+  } catch {
+    // best-effort
+  }
 }
 
 function hostOf(url: string): string {
@@ -94,6 +146,8 @@ export const extensionRouter = router({
         siteName: z.string().optional(),
         favicon: z.string().optional(),
         note: z.string().optional(),
+        tag: z.string().optional(),
+        summary: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {

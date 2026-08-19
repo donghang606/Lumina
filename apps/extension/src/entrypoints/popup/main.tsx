@@ -39,7 +39,8 @@ function App() {
     setSaving(true)
     setError('')
     try {
-      const settings = await browser.storage.local.get('serverUrl')
+      const raw = await browser.storage.local.get(['serverUrl', 'defaultTag', 'autoSummary'])
+      const settings = raw as { serverUrl?: string; defaultTag?: string; autoSummary?: boolean }
       const server = (settings.serverUrl as string) || SERVER_DEFAULT
       const res = await fetch(`${server}/api/extension/collect`, {
         method: 'POST',
@@ -52,6 +53,8 @@ function App() {
           siteName: data.siteName,
           favicon: data.favicon,
           note: note.trim() || undefined,
+          tag: settings.defaultTag?.trim() || undefined,
+          summary: settings.autoSummary !== false,
         }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)

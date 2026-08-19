@@ -6,20 +6,25 @@ const DEFAULT = 'http://localhost:3001'
 
 function App() {
   const [server, setServer] = useState(DEFAULT)
+  const [defaultTag, setDefaultTag] = useState('')
+  const [autoSummary, setAutoSummary] = useState(true)
   const [saved, setSaved] = useState(false)
   const [testing, setTesting] = useState(false)
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null)
 
   useEffect(() => {
     void (async () => {
-      const s = await browser.storage.local.get('serverUrl')
-      if (typeof s.serverUrl === 'string' && s.serverUrl) setServer(s.serverUrl)
+      const s = await browser.storage.local.get(['serverUrl', 'defaultTag', 'autoSummary'])
+      const { serverUrl, defaultTag: dt, autoSummary: as } = s as { serverUrl?: string; defaultTag?: string; autoSummary?: boolean }
+      if (typeof serverUrl === 'string' && serverUrl) setServer(serverUrl)
+      if (typeof dt === 'string') setDefaultTag(dt)
+      if (typeof as === 'boolean') setAutoSummary(as)
     })()
   }, [])
 
   const save = async () => {
     const url = server.trim().replace(/\/+$/, '') || DEFAULT
-    await browser.storage.local.set({ serverUrl: url })
+    await browser.storage.local.set({ serverUrl: url, defaultTag: defaultTag.trim(), autoSummary })
     setServer(url)
     setSaved(true)
     setStatus(null)
@@ -55,7 +60,11 @@ function App() {
         label { display: block; font-size: 13px; margin-bottom: 6px; color: #333; }
         input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #ccd3e0; border-radius: 8px; font-size: 13px; }
         input:focus { outline: none; border-color: #4c6fff; }
-        .row { display: flex; gap: 8px; margin-top: 14px; }
+        .field { margin-top: 14px; }
+        .check { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+        .check input { width: auto; }
+        .check label { margin: 0; cursor: pointer; }
+        .row { display: flex; gap: 8px; margin-top: 16px; }
         button { padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; border: 1px solid #ccd3e0; background: #fff; }
         button.primary { background: #4c6fff; color: #fff; border-color: #4c6fff; }
         button.primary:disabled { opacity: 0.6; cursor: default; }
@@ -70,13 +79,35 @@ function App() {
         <h1>Lumina 收藏 · 设置</h1>
         <p className="desc">配置收藏内容要发送到哪台本地服务。</p>
 
-        <label htmlFor="server">Lumina 服务地址</label>
-        <input
-          id="server"
-          value={server}
-          onChange={(e) => setServer(e.target.value)}
-          placeholder={DEFAULT}
-        />
+        <div className="field">
+          <label htmlFor="server">Lumina 服务地址</label>
+          <input
+            id="server"
+            value={server}
+            onChange={(e) => setServer(e.target.value)}
+            placeholder={DEFAULT}
+          />
+        </div>
+
+        <div className="field">
+          <label htmlFor="tag">默认标签（可选）</label>
+          <input
+            id="tag"
+            value={defaultTag}
+            onChange={(e) => setDefaultTag(e.target.value)}
+            placeholder="例如：网页收藏"
+          />
+        </div>
+
+        <div className="check">
+          <input
+            id="summary"
+            type="checkbox"
+            checked={autoSummary}
+            onChange={(e) => setAutoSummary(e.target.checked)}
+          />
+          <label htmlFor="summary">收藏后自动生成 AI 摘要</label>
+        </div>
 
         <div className="row">
           <button className="primary" onClick={() => void save()}>保存</button>

@@ -56,7 +56,7 @@ export const noteService = {
   async publishParsedLinks(noteId: string, links: { targetNoteId: string; context?: string }[]): Promise<{ ok: boolean }> {
     return trpc.note.publishParsedLinks.mutate({ noteId, links })
   },
-  async autoProcess(noteId: string): Promise<{ ok: boolean; results?: { summary?: string; tags?: string[] }; reason?: string }> {
+  async autoProcess(noteId: string): Promise<{ ok: boolean; results?: { summary?: string; tags?: string[]; reviewPending?: boolean }; reason?: string }> {
     return trpc.note.autoProcess.mutate({ noteId })
   },
   async embed(id: string): Promise<{ ok: boolean; chunks?: number; reason?: string }> {

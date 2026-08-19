@@ -168,3 +168,18 @@ export interface Insights {
 }
 
 export type FeedType = 'card' | 'note' | 'bookmark' | 'file'
+
+export type SuggestionKind = 'summary' | 'tags' | 'note' | 'wiki'
+export type SuggestionStatus = 'pending' | 'applied' | 'rejected'
+export type SuggestionSource = 'auto' | 'mcp'
+
+export interface ReviewSuggestion {
+  id: string
+  kind: SuggestionKind
+  noteId: string | null
+  noteTitle: string | null
+  payload: Record<string, unknown>
+  status: SuggestionStatus
+  source: SuggestionSource
+  createdAt: string
+}

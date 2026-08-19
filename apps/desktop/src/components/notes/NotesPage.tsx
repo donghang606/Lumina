@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Typography, Tag as ATag, Empty, Message, Spin } from '@arco-design/web-react'
-import { Plus, Tag as TagIcon, CornerUpLeft, CornerUpRight, ArrowRight, Sparkles, Blocks } from 'lucide-react'
+import { Plus, Tag as TagIcon, CornerUpLeft, CornerUpRight, ArrowRight, Sparkles, Blocks, Inbox } from 'lucide-react'
 import { useNoteStore } from '../../stores/noteStore'
 import { noteService } from '../../services/noteService'
 import { configService } from '../../services/configService'
 import { mdToPlainText } from '../../lib/markdown'
 import NoteEditor from './NoteEditor'
+import ReviewQueue, { useReviewCount } from '../review/ReviewQueue'
 import type { NoteDetail, RelatedNote, BlockRef } from '@lumina/shared'
 import UiButton from '../ui/UiButton'
 import { Glass } from '../ui/primitives'
@@ -26,6 +27,8 @@ export default function NotesPage() {
   const [related, setRelated] = useState<RelatedNote[]>([])
   const [relatedLoading, setRelatedLoading] = useState(false)
   const [blockRefs, setBlockRefs] = useState<BlockRef[]>([])
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const { count: reviewCount, refresh: refreshReview } = useReviewCount()
 
   useEffect(() => {
     if (editing?.noteId) {
@@ -94,11 +97,14 @@ export default function NotesPage() {
 
   const saveEditing = async () => {
     if (!editing) return
-    const { content } = editing
-    await updateNote({ id: editing.noteId, title: editing.title, content })
-    await publishLinks(editing.noteId, content)
+    await persistEditing(editing)
     setEditing(null)
-    void runAutoProcess(editing.noteId, content)
+  }
+
+  const persistEditing = async (e: EditingState) => {
+    await updateNote({ id: e.noteId, title: e.title, content: e.content })
+    await publishLinks(e.noteId, e.content)
+    void runAutoProcess(e.noteId, e.content)
   }
 
   const runAutoProcess = async (id: string, content: string) => {
@@ -108,7 +114,11 @@ export default function NotesPage() {
     try {
       const r = await noteService.autoProcess(id)
       if (r.ok && r.results) {
-        const hints = [r.results.summary ? `摘要已生成` : '', r.results.tags?.length ? `添加了标签 #${r.results.tags.join(' #')}` : '']
+        const reviewed = r.results.reviewPending ?? false
+        const hints = [
+          r.results.summary ? (reviewed ? `摘要已生成，待审核` : `摘要已生成`) : '',
+          r.results.tags?.length ? (reviewed ? `标签已建议，待审核` : `添加了标签 #${r.results.tags.join(' #')}`) : '',
+        ]
           .filter(Boolean)
           .join('，')
         if (hints) Message.success(`✨ ${hints}`)
@@ -182,6 +192,7 @@ export default function NotesPage() {
             onTitleChange={(v) => setEditing({ ...editing, title: v })}
             onContentChange={(v) => setEditing({ ...editing, content: v })}
             onSave={saveEditing}
+            onAutoSave={() => editing && void persistEditing(editing)}
             onClose={() => setEditing(null)}
             onOpenLink={(id) => void openNote(id)}
           />
@@ -297,9 +308,14 @@ export default function NotesPage() {
         <Text className="display" style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--text-1)' }}>
           全部笔记
         </Text>
-        <UiButton variant="primary" icon={Plus} onClick={() => void startNew()}>
-          新建笔记
-        </UiButton>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <UiButton icon={Inbox} onClick={() => { setReviewOpen(true); void refreshReview() }}>
+            审核队列{reviewCount > 0 ? ` (${reviewCount})` : ''}
+          </UiButton>
+          <UiButton variant="primary" icon={Plus} onClick={() => void startNew()}>
+            新建笔记
+          </UiButton>
+        </div>
       </div>
 
       {notes.length === 0 && <Empty description="还没有笔记，点击右上角新建" />}
@@ -325,6 +341,8 @@ export default function NotesPage() {
           </Glass>
         ))}
       </div>
+
+      {reviewOpen && <ReviewQueue onClose={() => setReviewOpen(false)} onOpenNote={(id) => void openNote(id)} />}
     </div>
   )
 }

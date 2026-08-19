@@ -5,6 +5,7 @@ import HomeFeed from './components/HomeFeed'
 import AISidePanel from './components/ai/AISidePanel'
 import NotesPage from './components/notes/NotesPage'
 import GraphPage from './components/graph/GraphPage'
+import TimelinePage from './components/timeline/TimelinePage'
 import SettingsPage from './components/settings/SettingsPage'
 import { useLayoutStore } from './stores/layoutStore'
 import { useTheme } from './hooks/useTheme'
@@ -15,6 +16,7 @@ function CurrentPage() {
   if (nav === 'feed') return <HomeFeed />
   if (nav === 'notes') return <NotesPage />
   if (nav === 'graph') return <GraphPage />
+  if (nav === 'timeline') return <TimelinePage />
   return <SettingsPage />
 }
 

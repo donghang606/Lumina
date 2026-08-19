@@ -1,6 +1,6 @@
 import { router, publicProcedure } from '../trpc/context.js'
 import { z } from 'zod'
-import { notes, noteLinks, tagsOnNotes, tags, noteBlocks, blockRefs, noteTombstones } from '../db/schema.js'
+import { notes, noteLinks, tagsOnNotes, tags, noteBlocks, blockRefs, noteTombstones, aiSuggestions } from '../db/schema.js'
 import { randomUUID } from 'node:crypto'
 import { eq, or, sql, desc, inArray } from 'drizzle-orm'
 import { embedTexts, cosineSimilarity, getActiveProvider } from '../llm/provider.js'
@@ -257,7 +257,16 @@ export const noteRouter = router({
           ], { maxTokens: 80 })
           if (summary) {
             results.summary = summary
-            await ctx.db.update(notes).set({ summary }).where(eq(notes.id, input.noteId)).run()
+            if (row.summary !== summary) {
+              await ctx.db.insert(aiSuggestions).values({
+                id: randomUUID(),
+                kind: 'summary',
+                noteId: input.noteId,
+                payload: { summary },
+                source: 'auto',
+                createdAt: new Date().toISOString(),
+              }).run()
+            }
           }
         } catch (e) {
           results.summary = undefined
@@ -292,14 +301,21 @@ export const noteRouter = router({
             }
           }
           if (toAdd.length > 0) {
-            await ctx.db.insert(tagsOnNotes).values(toAdd.map((t) => ({ noteId: input.noteId, tagId: t.id, assignedBy: 'auto' as const, confidence: 0.8 }))).onConflictDoNothing().run()
+            await ctx.db.insert(aiSuggestions).values({
+              id: randomUUID(),
+              kind: 'tags',
+              noteId: input.noteId,
+              payload: { tags: toAdd.map((t) => ({ id: t.id, name: t.name })) },
+              source: 'auto',
+              createdAt: new Date().toISOString(),
+            }).run()
           }
           results.tags = toAdd.map((t) => t.name)
         } catch {
           results.tags = undefined
         }
       }
-      return { ok: true, results }
+      return { ok: true, results, reviewPending: true }
     }),
 
   publishParsedLinks: publicProcedure

@@ -64,6 +64,7 @@ export async function initDb(c = client) {
     id TEXT PRIMARY KEY, url TEXT NOT NULL, title TEXT NOT NULL DEFAULT '',
     description TEXT, site_name TEXT, favicon TEXT,
     content TEXT NOT NULL DEFAULT '',
+    content_hash TEXT,
     note_id TEXT REFERENCES notes(id) ON DELETE CASCADE, collected_at TEXT NOT NULL
   )`)
 
@@ -127,6 +128,14 @@ export async function initDb(c = client) {
     deleted_by TEXT NOT NULL
   )`)
 
+  await sql.execute(`CREATE TABLE IF NOT EXISTS ai_suggestions (
+    id TEXT PRIMARY KEY, kind TEXT NOT NULL,
+    note_id TEXT, payload TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    source TEXT NOT NULL DEFAULT 'auto',
+    created_at TEXT NOT NULL
+  )`)
+
   await migrateLegacyApiKeys(sql)
 }
 
@@ -163,5 +172,11 @@ async function migrateSettingsColumns(sql: ReturnType<typeof createClient>) {
     } catch {
       // column already exists
     }
+  }
+
+  try {
+    await sql.execute(`ALTER TABLE collections ADD COLUMN content_hash TEXT`)
+  } catch {
+    // column already exists
   }
 }

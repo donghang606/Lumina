@@ -47,14 +47,17 @@ interface Props {
   onTitleChange: (v: string) => void
   onContentChange: (v: string) => void
   onSave: () => void
+  onAutoSave?: () => void
   onClose: () => void
   onOpenLink?: (noteId: string) => void
 }
 
-export default function NoteEditor({ noteId, title, content, onTitleChange, onContentChange, onSave, onClose, onOpenLink }: Props) {
+export default function NoteEditor({ noteId, title, content, onTitleChange, onContentChange, onSave, onAutoSave, onClose, onOpenLink }: Props) {
   const { deleteNote } = useNoteStore()
   const [preview, setPreview] = useState<{ x: number; y: number; data: { title: string; summary: string | null; tags: { id: string; name: string; color: string | null }[] } } | null>(null)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [editable, setEditable] = useState(true)
 
   const editor = useEditor({
     extensions: [
@@ -69,6 +72,7 @@ export default function NoteEditor({ noteId, title, content, onTitleChange, onCo
     ],
     content,
     contentType: 'markdown',
+    editable,
     onUpdate: ({ editor: e }) => onContentChange(e.getMarkdown()),
     editorProps: {
       attributes: {
@@ -92,6 +96,57 @@ export default function NoteEditor({ noteId, title, content, onTitleChange, onCo
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noteId])
+
+  // 保存时显示反馈
+  const [savedFlash, setSavedFlash] = useState(false)
+  useEffect(() => {
+    if (!savedFlash) return
+    const t = setTimeout(() => setSavedFlash(false), 1200)
+    return () => clearTimeout(t)
+  }, [savedFlash])
+
+  const doAutoSave = () => {
+    if (!onAutoSave) return
+    onAutoSave()
+    setSavedFlash(true)
+  }
+
+  // 自动保存：输入停顿 ~2s 落盘（KnowMe 借鉴）
+  useEffect(() => {
+    if (!onAutoSave) return
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = setTimeout(doAutoSave, 2000)
+    return () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, content, onAutoSave])
+
+  // ⌘S / Ctrl+S 立即保存
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        if (onAutoSave) doAutoSave()
+        else onSave()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onAutoSave, onSave])
+
+  // ⌘E / Ctrl+E 切换编辑 / 阅读模式（KnowMe 三态编辑器借鉴）
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'e') {
+        e.preventDefault()
+        setEditable((v) => !v)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const onDelete = async () => {
     if (!noteId) return
@@ -197,6 +252,15 @@ export default function NoteEditor({ noteId, title, content, onTitleChange, onCo
         </button>
         <button className="lumina-toolbtn lumina-toolbtn-primary" onClick={onSave}>
           <Check size={14} /> 保存
+        </button>
+        {savedFlash && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--accent)', fontWeight: 600 }}>已自动保存</span>}
+        <button
+          className="lumina-toolbtn"
+          style={{ color: editable ? 'var(--text-2)' : 'var(--accent)', border: '1px solid var(--glass-border)' }}
+          onClick={() => setEditable((v) => !v)}
+          title="⌘E 切换编辑 / 阅读"
+        >
+          {editable ? '编辑中' : '阅读'} · ⌘E
         </button>
       </div>
 

@@ -11,6 +11,7 @@ import { mcpRouter } from './mcp.js'
 import { transferRouter } from './transfer.js'
 import { viewRouter } from './view.js'
 import { syncRouter } from './sync.js'
+import { reviewRouter } from './review.js'
 
 export const appRouter = router({
   note: noteRouter,
@@ -25,6 +26,7 @@ export const appRouter = router({
   transfer: transferRouter,
   view: viewRouter,
   sync: syncRouter,
+  review: reviewRouter,
 })
 
 export type AppRouter = typeof appRouter

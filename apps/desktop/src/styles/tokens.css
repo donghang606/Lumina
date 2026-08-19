@@ -472,6 +472,36 @@ h1, h2, h3, .display {
   }
 }
 
+.lumina-review-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+.lumina-review-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  background: var(--glass-hi);
+  color: var(--text-2);
+}
+.lumina-review-text {
+  font-size: var(--text-md);
+  color: var(--text-2);
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
 .lumina-editor-title {
   width: 100%;
   border: none;

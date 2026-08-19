@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
 import { eq, desc, sql } from 'drizzle-orm'
 import type { db as LuminaDb } from '../db/client.js'
-import { notes, noteLinks, tagsOnNotes, tags, noteBlocks, views } from '../db/schema.js'
+import { notes, noteLinks, tagsOnNotes, tags, noteBlocks, views, aiSuggestions } from '../db/schema.js'
 
 export function createLuminaMcpServer(db: typeof LuminaDb): McpServer {
   const server = new McpServer({ name: 'lumina-mcp', version: '0.1.0' })
@@ -113,6 +113,32 @@ export function createLuminaMcpServer(db: typeof LuminaDb): McpServer {
         await db.insert(tagsOnNotes).values(tagIds.map((tagId) => ({ noteId: id, tagId, assignedBy: 'manual' as const })))
       }
       return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, id }) }] }
+    },
+  )
+
+  server.tool(
+    'propose_note',
+    '提交一篇新笔记的建议，不直接建库——进入审核队列（Review queue），用户在 Lumina 桌面端确认后才会真正落库。',
+    {
+      title: z.string().optional().describe('建议标题'),
+      content: z.string().describe('建议正文（Markdown）'),
+      type: z.enum(['card', 'note', 'bookmark', 'file']).optional().describe('类型，默认 note'),
+      tagNames: z.array(z.string()).optional().describe('建议标签名列表'),
+    },
+    async ({ title = '', content = '', type = 'note', tagNames = [] }) => {
+      if (!content.trim()) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: '内容不能为空' }) }] }
+      }
+      const id = randomUUID()
+      await db.insert(aiSuggestions).values({
+        id,
+        kind: 'note',
+        noteId: null,
+        payload: { title, content, type, tags: tagNames },
+        source: 'mcp',
+        createdAt: new Date().toISOString(),
+      }).run()
+      return { content: [{ type: 'text' as const, text: JSON.stringify({ ok: true, suggestionId: id, status: 'pending' }) }] }
     },
   )
 

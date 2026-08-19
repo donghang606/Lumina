@@ -72,6 +72,7 @@ export const collections = sqliteTable('collections', {
   siteName: text('site_name'),
   favicon: text('favicon'),
   content: text('content').notNull().default(''),
+  contentHash: text('content_hash'),
   noteId: text('note_id').references(() => notes.id, { onDelete: 'cascade' }),
   collectedAt: text('collected_at').notNull(),
 })
@@ -160,4 +161,15 @@ export const noteTombstones = sqliteTable('note_tombstones', {
   noteId: text('note_id').primaryKey(),
   deletedAt: text('deleted_at').notNull(),
   deletedBy: text('deleted_by').notNull(),
+})
+
+/** AI 生成内容的审核队列：摘要/标签/MCP 建议先进此表，用户确认后才落库（KnowMe Review queue 借鉴） */
+export const aiSuggestions = sqliteTable('ai_suggestions', {
+  id: text('id').primaryKey(),
+  kind: text('kind', { enum: ['summary', 'tags', 'note', 'wiki'] }).notNull(),
+  noteId: text('note_id').references(() => notes.id, { onDelete: 'cascade' }),
+  payload: text('payload', { mode: 'json' }).$type<Record<string, unknown>>().notNull(),
+  status: text('status', { enum: ['pending', 'applied', 'rejected'] }).notNull().default('pending'),
+  source: text('source', { enum: ['auto', 'mcp'] }).notNull().default('auto'),
+  createdAt: text('created_at').notNull(),
 })

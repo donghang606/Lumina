@@ -14,6 +14,7 @@ import {
   FolderPlus,
   FileText,
   Ghost,
+  History,
 } from 'lucide-react'
 import { useNoteStore } from '../../stores/noteStore'
 import { useLayoutStore, type NavKey } from '../../stores/layoutStore'
@@ -25,6 +26,7 @@ const navItems: { key: NavKey; label: string; Icon: typeof LayoutDashboard }[] =
   { key: 'feed', label: '工作台', Icon: LayoutDashboard },
   { key: 'notes', label: '笔记', Icon: StickyNote },
   { key: 'graph', label: '图谱', Icon: Network },
+  { key: 'timeline', label: '时间线', Icon: History },
   { key: 'settings', label: '设置', Icon: Settings },
 ]
 

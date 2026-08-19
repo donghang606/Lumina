@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseMarkdown, toMarkdown, sanitizeFilename, mdToPlainText } from './markdown'
+import { parseMarkdown, toMarkdown, sanitizeFilename, mdToPlainText, mdToHtml } from './markdown'
 
 describe('parseMarkdown', () => {
   it('parses frontmatter with array tags', () => {
@@ -107,5 +107,26 @@ describe('mdToPlainText', () => {
 
   it('tolerates empty input', () => {
     expect(mdToPlainText('')).toBe('')
+  })
+})
+
+describe('mdToHtml', () => {
+  it('renders markdown into a standalone HTML document', () => {
+    const html = mdToHtml('# 你好\n\n正文 **加粗**', '测试笔记')
+    expect(html).toContain('<!DOCTYPE html>')
+    expect(html).toContain('<title>测试笔记</title>')
+    expect(html).toContain('<h1>你好</h1>')
+    expect(html).toContain('<strong>加粗</strong>')
+  })
+
+  it('escapes unsafe title', () => {
+    const html = mdToHtml('', '<script>alert(1)</script>')
+    expect(html).not.toContain('<script>')
+    expect(html).toContain('&lt;script&gt;')
+  })
+
+  it('tolerates empty input', () => {
+    const html = mdToHtml('', 'x')
+    expect(html).toContain('</html>')
   })
 })

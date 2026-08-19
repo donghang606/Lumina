@@ -79,6 +79,42 @@ export function sanitizeFilename(name: string): string {
   return name.replace(/[\\/:*?"<>|\n\r]/g, '-').slice(0, 120) || 'untitled'
 }
 
+// 渲染为独立可分享的 HTML 文档（KnowMe/HTML 导出借鉴）
+export function mdToHtml(src: string, title: string): string {
+  let body: string
+  try {
+    body = marked.parse(src ?? '', { async: false }) as string
+  } catch {
+    body = `<p>${(src ?? '').replace(/</g, '&lt;').replace(/\n/g, '<br/>')}</p>`
+  }
+  const safeTitle = title.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>${safeTitle}</title>
+<style>
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 780px; margin: 0 auto; padding: 40px 24px; color: #24292f; line-height: 1.7; }
+  h1 { font-size: 1.6em; border-bottom: 1px solid #e1e4e8; padding-bottom: .3em; }
+  h2 { border-bottom: 1px solid #e1e4e8; padding-bottom: .3em; }
+  a { color: #0969da; }
+  code { background: #f6f8fa; padding: .15em .35em; border-radius: 6px; font-size: .9em; }
+  pre { background: #f6f8fa; padding: 14px; border-radius: 8px; overflow: auto; }
+  pre code { background: none; padding: 0; }
+  blockquote { border-left: 4px solid #d0d7de; margin-left: 0; padding-left: 14px; color: #57606a; }
+  table { border-collapse: collapse; }
+  th, td { border: 1px solid #d0d7de; padding: 6px 12px; }
+  img { max-width: 100%; }
+  hr { border: none; border-top: 1px solid #e1e4e8; }
+</style>
+</head>
+<body>
+${body}
+</body>
+</html>`
+}
+
 export function mdToPlainText(src: string): string {
   let html: string
   try {

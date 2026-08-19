@@ -25,11 +25,14 @@ import {
   Shrink,
   Expand,
   Loader2,
+  Download,
 } from 'lucide-react'
 import { useNoteStore } from '../../stores/noteStore'
 import { NoteLinker } from '../../extensions/NoteLinker'
 import { noteService } from '../../services/noteService'
 import { aiService } from '../../services/aiService'
+import { mdToHtml, sanitizeFilename } from '../../lib/markdown'
+import { download } from '../../lib/download'
 
 const { Text } = Typography
 
@@ -249,6 +252,15 @@ export default function NoteEditor({ noteId, title, content, onTitleChange, onCo
         <div style={{ flex: 1 }} />
         <button className="lumina-toolbtn" onClick={onDelete} style={{ color: 'var(--danger)' }} title="删除">
           <Trash2 size={14} /> 删除
+        </button>
+        <button
+          className="lumina-toolbtn"
+          onClick={() => {
+            download(`${sanitizeFilename(title || 'untitled')}.html`, mdToHtml(content, title || 'untitled'), 'text/html')
+          }}
+          title="导出 HTML"
+        >
+          <Download size={14} /> HTML
         </button>
         <button className="lumina-toolbtn lumina-toolbtn-primary" onClick={onSave}>
           <Check size={14} /> 保存

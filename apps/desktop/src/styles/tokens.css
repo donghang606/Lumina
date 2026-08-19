@@ -463,6 +463,57 @@ h1, h2, h3, .display {
   cursor: default;
 }
 
+.lumina-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all var(--dur-1) var(--ease-out);
+  max-width: 220px;
+}
+.lumina-tab:hover {
+  border-color: var(--border-2);
+  background: var(--glass-hi);
+}
+.lumina-tab.is-active {
+  border-color: var(--accent);
+  color: var(--text-1);
+  background: var(--accent-soft);
+}
+.lumina-tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lumina-tab-close {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.lumina-tab-close:hover {
+  background: var(--glass-hi);
+  color: var(--danger);
+}
+.lumina-tab-dirty::before {
+  content: '•';
+  color: var(--accent);
+  margin-right: 2px;
+}
+
 .lumina-spin {
   animation: lumina-rotate 0.9s linear infinite;
 }

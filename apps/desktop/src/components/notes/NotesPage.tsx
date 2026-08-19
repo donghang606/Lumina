@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Typography, Tag as ATag, Empty, Message, Spin } from '@arco-design/web-react'
-import { Plus, Tag as TagIcon, CornerUpLeft, CornerUpRight, ArrowRight, Sparkles, Blocks, Inbox } from 'lucide-react'
+import { Plus, Tag as TagIcon, CornerUpLeft, CornerUpRight, ArrowRight, Sparkles, Blocks, Inbox, X } from 'lucide-react'
 import { useNoteStore } from '../../stores/noteStore'
 import { noteService } from '../../services/noteService'
 import { configService } from '../../services/configService'
@@ -13,28 +13,36 @@ import { Glass } from '../ui/primitives'
 
 const { Text } = Typography
 
-interface EditingState {
+interface TabState {
   noteId: string
   title: string
   content: string
+  savedTitle: string
+  savedContent: string
 }
 
 export default function NotesPage() {
   const { notes, loaded, loadNotes, tags, loadTags, createNote, updateNote, setTagsForNote, selectedId } = useNoteStore()
   const [detailMap, setDetailMap] = useState<Record<string, NoteDetail>>({})
-  const [editing, setEditing] = useState<EditingState | null>(null)
-  const [refreshing, setRefreshing] = useState(false)
+  const [tabs, setTabs] = useState<TabState[]>([])
+  const [activeId, setActiveId] = useState<string | null>(null)
   const [related, setRelated] = useState<RelatedNote[]>([])
   const [relatedLoading, setRelatedLoading] = useState(false)
   const [blockRefs, setBlockRefs] = useState<BlockRef[]>([])
   const [reviewOpen, setReviewOpen] = useState(false)
   const { count: reviewCount, refresh: refreshReview } = useReviewCount()
 
+  const active = tabs.find((t) => t.noteId === activeId) ?? null
+
+  const updateTab = (id: string, patch: Partial<Pick<TabState, 'title' | 'content'>>) => {
+    setTabs((ts) => ts.map((t) => (t.noteId === id ? { ...t, ...patch } : t)))
+  }
+
   useEffect(() => {
-    if (editing?.noteId) {
+    if (active?.noteId) {
       let cancelled = false
       noteService
-        .listBlockRefs(editing.noteId)
+        .listBlockRefs(active.noteId)
         .then((refs) => {
           if (!cancelled) setBlockRefs(refs)
         })
@@ -46,15 +54,15 @@ export default function NotesPage() {
       }
     }
     setBlockRefs([])
-  }, [editing?.noteId, editing?.content])
+  }, [active?.noteId, active?.content])
 
   useEffect(() => {
-    if (editing?.noteId) {
+    if (active?.noteId) {
       let cancelled = false
       setRelatedLoading(true)
       const t = setTimeout(async () => {
         try {
-          const items = await noteService.related(editing.noteId)
+          const items = await noteService.related(active.noteId)
           if (!cancelled) setRelated(items)
         } catch {
           if (!cancelled) setRelated([])
@@ -68,7 +76,7 @@ export default function NotesPage() {
       }
     }
     setRelated([])
-  }, [editing?.noteId, editing?.content])
+  }, [active?.noteId, active?.content])
 
   useEffect(() => {
     if (!loaded) void loadNotes()
@@ -83,28 +91,46 @@ export default function NotesPage() {
   }, [selectedId])
 
   const openNote = async (id: string) => {
+    if (tabs.some((t) => t.noteId === id)) {
+      setActiveId(id)
+      return
+    }
     const detail = await noteService.getWithDetails(id)
     if (!detail) return
     setDetailMap((m) => ({ ...m, [id]: detail }))
-    setEditing({ noteId: id, title: detail.note.title, content: detail.note.content })
+    setTabs((ts) => [
+      ...ts,
+      { noteId: id, title: detail.note.title, content: detail.note.content, savedTitle: detail.note.title, savedContent: detail.note.content },
+    ])
+    setActiveId(id)
   }
 
   const startNew = async () => {
     const id = await createNote({ title: '', content: '' })
     if (!id) return
-    setEditing({ noteId: id, title: '', content: '' })
+    setTabs((ts) => [...ts, { noteId: id, title: '', content: '', savedTitle: '', savedContent: '' }])
+    setActiveId(id)
+  }
+
+  const closeTab = (id: string) => {
+    const idx = tabs.findIndex((t) => t.noteId === id)
+    setTabs((ts) => ts.filter((t) => t.noteId !== id))
+    if (activeId === id) {
+      const remaining = tabs.filter((t) => t.noteId !== id)
+      setActiveId(remaining[Math.max(0, idx - 1)]?.noteId ?? null)
+    }
+  }
+
+  const persistEditing = async (e: TabState) => {
+    await updateNote({ id: e.noteId, title: e.title, content: e.content })
+    await publishLinks(e.noteId, e.content)
+    setTabs((ts) => ts.map((t) => (t.noteId === e.noteId ? { ...t, savedTitle: t.title, savedContent: t.content } : t)))
+    void runAutoProcess(e.noteId, e.content)
   }
 
   const saveEditing = async () => {
-    if (!editing) return
-    await persistEditing(editing)
-    setEditing(null)
-  }
-
-  const persistEditing = async (e: EditingState) => {
-    await updateNote({ id: e.noteId, title: e.title, content: e.content })
-    await publishLinks(e.noteId, e.content)
-    void runAutoProcess(e.noteId, e.content)
+    if (!active) return
+    await persistEditing(active)
   }
 
   const runAutoProcess = async (id: string, content: string) => {
@@ -165,38 +191,62 @@ export default function NotesPage() {
   }
 
   const toggleTag = async (tagId: string) => {
-    if (!editing) return
-    const detail = detailMap[editing.noteId]
+    if (!active) return
+    const detail = detailMap[active.noteId]
     const current = detail?.tags.map((t) => t.id) ?? []
     const next = current.includes(tagId) ? current.filter((id) => id !== tagId) : [...current, tagId]
-    await setTagsForNote(editing.noteId, next)
-    openNote(editing.noteId)
+    await setTagsForNote(active.noteId, next)
+    const fresh = await noteService.getWithDetails(active.noteId)
+    if (fresh) setDetailMap((m) => ({ ...m, [active.noteId]: fresh }))
   }
 
   const deleteEditing = async () => {
-    if (!editing) return
-    await noteService.remove(editing.noteId)
+    if (!active) return
+    await noteService.remove(active.noteId)
     await loadNotes()
-    setEditing(null)
+    closeTab(active.noteId)
   }
 
-  if (editing) {
-    const detail = detailMap[editing.noteId]
+  if (active) {
+    const detail = detailMap[active.noteId]
     return (
-      <div style={{ display: 'flex', height: '100%', gap: 18 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <NoteEditor
-            noteId={editing.noteId}
-            title={editing.title}
-            content={editing.content}
-            onTitleChange={(v) => setEditing({ ...editing, title: v })}
-            onContentChange={(v) => setEditing({ ...editing, content: v })}
-            onSave={saveEditing}
-            onAutoSave={() => editing && void persistEditing(editing)}
-            onClose={() => setEditing(null)}
-            onOpenLink={(id) => void openNote(id)}
-          />
-        </div>
+      <div style={{ display: 'flex', height: '100%', gap: 18, flexDirection: 'column' }}>
+        {/* 标签页栏 */}
+        {tabs.length > 1 && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {tabs.map((t) => {
+              const dirty = t.title !== t.savedTitle || t.content !== t.savedContent
+              return (
+                <div
+                  key={t.noteId}
+                  className={`lumina-tab${t.noteId === activeId ? ' is-active' : ''}`}
+                  onClick={() => setActiveId(t.noteId)}
+                  title={t.title || '(无标题)'}
+                >
+                  <span className={`lumina-tab-label${dirty ? ' lumina-tab-dirty' : ''}`}>{t.title || '(无标题)'}</span>
+                  <button className="lumina-tab-close" onClick={(e) => { e.stopPropagation(); closeTab(t.noteId) }}>
+                    <X size={11} />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', flex: 1, minHeight: 0, gap: 18 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <NoteEditor
+              noteId={active.noteId}
+              title={active.title}
+              content={active.content}
+              onTitleChange={(v) => updateTab(active.noteId, { title: v })}
+              onContentChange={(v) => updateTab(active.noteId, { content: v })}
+              onSave={() => void saveEditing()}
+              onAutoSave={() => void persistEditing(active)}
+              onClose={() => closeTab(active.noteId)}
+              onOpenLink={(id) => void openNote(id)}
+            />
+          </div>
 
         {/* 侧栏：标签 / 链接 */}
         {detail && (
@@ -298,6 +348,7 @@ export default function NotesPage() {
             )}
           </Glass>
         )}
+        </div>
       </div>
     )
   }

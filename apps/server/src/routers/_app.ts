@@ -12,6 +12,7 @@ import { transferRouter } from './transfer.js'
 import { viewRouter } from './view.js'
 import { syncRouter } from './sync.js'
 import { reviewRouter } from './review.js'
+import { bookmarkRouter } from './bookmark.js'
 
 export const appRouter = router({
   note: noteRouter,
@@ -27,6 +28,7 @@ export const appRouter = router({
   view: viewRouter,
   sync: syncRouter,
   review: reviewRouter,
+  bookmark: bookmarkRouter,
 })
 
 export type AppRouter = typeof appRouter

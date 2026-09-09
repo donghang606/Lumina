@@ -12,7 +12,7 @@ export const mcpRouter = router({
   }),
 
   callTool: publicProcedure
-    .input(z.object({ server: z.string(), tool: z.string(), input: z.record(z.unknown()).default({}) }))
+    .input(z.object({ server: z.string(), tool: z.string(), input: z.record(z.string(), z.unknown()).default({}) }))
     .mutation(async ({ ctx, input }) => {
       return callMcpTool(ctx, { server: input.server, tool: input.tool, input: input.input })
     }),

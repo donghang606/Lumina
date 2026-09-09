@@ -10,12 +10,13 @@ import { getActiveProvider } from './llm/provider.js'
 import { transcribeAudio, resolveTranscribeModel } from './lib/transcribe.js'
 import { decryptSecret } from './lib/secrets.js'
 import { createLuminaMcpServer, createLuminaMcpTransport } from './mcp/luminaServer.js'
+import { runAgentTurn, type AgentEvent } from './agent/runner.js'
 
 const app = express()
 const PORT = 3001
 
 app.use(cors())
-app.use('/trpc', createExpressMiddleware({ router: appRouter, createContext }))
+app.use('/trpc', express.json({ limit: '10mb' }), createExpressMiddleware({ router: appRouter, createContext }))
 
 // 无状态模式：每个 HTTP 请求独立 server+transport（官方无状态写法，支持任意 MCP 客户端并发连接）
 const handleMcp = async (req: import('express').Request, res: import('express').Response, body?: unknown) => {
@@ -33,7 +34,38 @@ app.post('/mcp', express.json({ limit: '10mb' }), (req, res) => handleMcp(req, r
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }))
 
-app.get('/health', (_req, res) => res.json({ status: 'ok' }))
+// Agent SSE 流式端点：POST /api/agent/chat → text/event-stream
+// 事件类型：tool-call / tool-result / interrupt / done / error
+app.post('/api/agent/chat', express.json({ limit: '5mb' }), async (req, res) => {
+  const ctx = createContext({ req, res } as never)
+  const body = (req.body ?? {}) as { message?: string; conversationId?: string; resume?: { threadId: string; decision: 'approve' | 'reject' } }
+
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.flushHeaders?.()
+
+  const send = (event: AgentEvent) => {
+    res.write(`event: ${event.type}\ndata: ${JSON.stringify(event.payload ?? {})}\n\n`)
+  }
+
+  const heartbeat = setInterval(() => res.write(': ping\n\n'), 15000)
+  req.on('close', () => clearInterval(heartbeat))
+
+  try {
+    const result = await runAgentTurn(
+      ctx,
+      { message: body.message ?? '', conversationId: body.conversationId, resume: body.resume },
+      send,
+    )
+    send({ type: 'done', payload: { conversationId: result.conversationId, reply: result.reply, pendingApproval: result.pendingApproval ?? null } })
+  } catch (e) {
+    send({ type: 'error', payload: e instanceof Error ? e.message : String(e) })
+  } finally {
+    clearInterval(heartbeat)
+    res.end()
+  }
+})
 
 app.post('/api/extension/collect', express.json({ limit: '10mb' }), async (req, res) => {
   try {

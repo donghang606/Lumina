@@ -173,3 +173,15 @@ export const aiSuggestions = sqliteTable('ai_suggestions', {
   source: text('source', { enum: ['auto', 'mcp'] }).notNull().default('auto'),
   createdAt: text('created_at').notNull(),
 })
+
+/** 本地文件导入：外部文件提取文本建为笔记并索引；contentHash 用于增量（文件变更重导入） */
+export const fileIngests = sqliteTable('file_ingests', {
+  id: text('id').primaryKey(),
+  filePath: text('file_path').notNull(),
+  fileName: text('file_name').notNull(),
+  ext: text('ext').notNull(),
+  contentHash: text('content_hash').notNull(),
+  charCount: text('char_count').notNull().default('0'),
+  noteId: text('note_id').references(() => notes.id, { onDelete: 'cascade' }),
+  ingestedAt: text('ingested_at').notNull(),
+})

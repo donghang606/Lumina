@@ -6,6 +6,7 @@ import { aiService } from '../../services/aiService'
 import { noteService } from '../../services/noteService'
 import { mcpService } from '../../services/mcpService'
 import { harnessService, type HarnessStatus } from '../../services/harnessService'
+import { ingestService, type FileIngestRecord } from '../../services/ingestService'
 import { transferService, type ExportItem } from '../../services/transferService'
 import { setServerUrl, getServerUrlRaw } from '../../lib/trpc'
 import { parseMarkdown, toMarkdown, sanitizeFilename } from '../../lib/markdown'
@@ -38,6 +39,54 @@ export default function SettingsPage() {
   const [mcpTools, setMcpTools] = useState<string>('')
   const [harness, setHarness] = useState<HarnessStatus | null>(null)
   const [harnessBusy, setHarnessBusy] = useState(false)
+  const [ingests, setIngests] = useState<FileIngestRecord[]>([])
+  const [ingestBusy, setIngestBusy] = useState(false)
+  const [ingestMsg, setIngestMsg] = useState('')
+
+  const refreshIngests = async () => {
+    try {
+      setIngests(await ingestService.list())
+    } catch {
+      /* server offline */
+    }
+  }
+
+  useEffect(() => {
+    void refreshIngests()
+  }, [reload])
+
+  const doIngestFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setIngestBusy(true)
+    setIngestMsg('')
+    try {
+      let ok = 0
+      let skip = 0
+      let fail = 0
+      const paths = Array.from(files).map((f) => (f as File & { path?: string }).path).filter(Boolean) as string[]
+      if (paths.length === 0) {
+        setIngestMsg('当前环境无法读取文件路径（请在 Tauri 桌面端使用）')
+        return
+      }
+      for (const p of paths) {
+        const r = await ingestService.ingestFile(p)
+        if (r.ok && !r.skipped) ok++
+        else if (r.skipped) skip++
+        else fail++
+      }
+      setIngestMsg(`导入 ${ok} 个，跳过（无变化）${skip} 个，失败 ${fail} 个`)
+      await refreshIngests()
+    } catch (e) {
+      setIngestMsg(e instanceof Error ? e.message : String(e))
+    } finally {
+      setIngestBusy(false)
+    }
+  }
+
+  const removeIngest = async (id: string) => {
+    await ingestService.remove(id)
+    await refreshIngests()
+  }
   const [exporting, setExporting] = useState(false)
   const [importing, setImporting] = useState(false)
   const importRef = useRef<HTMLInputElement>(null)
@@ -796,6 +845,45 @@ export default function SettingsPage() {
               <p style={{ margin: 0 }}>JSON 备份保留全部字段（含来源 URL、标签、创建时间），适合完整迁移与还原。</p>
               <p style={{ margin: 'var(--sp-1) 0 0' }}>Markdown 文件夹导出为 Obsidian 兼容格式（frontmatter 标签 + [[双链]]），可直接拖入 Obsidian；导入支持同格式反向解析。</p>
             </div>
+            <div style={{ height: 1, background: 'var(--border-1)', margin: 'var(--sp-4) 0' }} />
+            <div className="lumina-label" style={{ marginBottom: 'var(--sp-3)' }}>本地文件导入（RAG 知识源）</div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 'var(--sp-3)' }}>
+              <label className="lumina-toolbtn" style={{ cursor: ingestBusy ? 'wait' : 'pointer', opacity: ingestBusy ? 0.5 : 1, padding: '4px 12px', fontSize: 'var(--text-sm)' }}>
+                选择文件导入
+                <input
+                  type="file"
+                  multiple
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.epub,.md,.markdown,.txt"
+                  style={{ display: 'none' }}
+                  onChange={(e) => void doIngestFiles(e.target.files)}
+                />
+              </label>
+            </div>
+            {ingestMsg && <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-2)', marginBottom: 'var(--sp-2)' }}>{ingestMsg}</div>}
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-3)', lineHeight: 1.7, marginBottom: 'var(--sp-3)' }}>
+              支持 PDF / Word / Excel / PPT / EPUB / Markdown / 文本。提取正文建为 type=file 笔记并写入向量索引（Zvec），同文件无变化时跳过。
+            </div>
+            {ingests.length > 0 && (
+              <Table
+                data={ingests.slice(0, 20)}
+                pagination={false}
+                rowKey="id"
+                size="mini"
+                columns={[
+                  { title: '文件', dataIndex: 'fileName', render: (v: string, r: FileIngestRecord) => <Text title={r.filePath}>{v}</Text> },
+                  { title: '类型', dataIndex: 'ext', width: 70, render: (v: string) => <Tag size="small">{v}</Tag> },
+                  { title: '字数', dataIndex: 'charCount', width: 90 },
+                  { title: '导入时间', dataIndex: 'ingestedAt', width: 180, render: (v: string) => <Text style={{ fontSize: 'var(--text-xs)' }}>{v?.slice(0, 16).replace('T', ' ')}</Text> },
+                  {
+                    title: '操作',
+                    width: 70,
+                    render: (_: unknown, r: FileIngestRecord) => (
+                      <Button size="mini" type="text" status="danger" onClick={() => void removeIngest(r.id)}>移除</Button>
+                    ),
+                  },
+                ]}
+              />
+            )}
           </Glass>
         </Tabs.TabPane>
       </Tabs>

@@ -10,3 +10,4 @@ allowBuilds:
   node-pty: true
   protobufjs: true
   spawn-sync: true
+  tesseract.js: false

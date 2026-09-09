@@ -136,6 +136,18 @@ export async function initDb(c = client) {
     created_at TEXT NOT NULL
   )`)
 
+  await sql.execute(`CREATE TABLE IF NOT EXISTS file_ingests (
+    id TEXT PRIMARY KEY,
+    file_path TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    ext TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    char_count TEXT NOT NULL DEFAULT '0',
+    note_id TEXT,
+    ingested_at TEXT NOT NULL,
+    FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
+  )`)
+
   await migrateLegacyApiKeys(sql)
 }
 

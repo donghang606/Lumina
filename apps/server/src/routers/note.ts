@@ -11,7 +11,7 @@ import { insertChunks, deleteNoteChunks, searchChunks } from '../lib/vectorstore
  * 块索引统一管道：libSQL BLOB（source of truth）+ Zvec HNSW 双写。
  * Zvec 失败不影响主流程（回退 BLOB 暴力余弦仍可用）。
  */
-async function indexNoteChunks(ctx: { db: typeof import('../db/client.js').db }, noteId: string, chunks: string[], vectors: number[][]): Promise<void> {
+export async function indexNoteChunks(ctx: { db: typeof import('../db/client.js').db }, noteId: string, chunks: string[], vectors: number[][]): Promise<void> {
   await ctx.db.delete(noteBlocks).where(eq(noteBlocks.noteId, noteId)).run()
   await ctx.db.insert(noteBlocks).values(
     chunks.map((c, i) => ({

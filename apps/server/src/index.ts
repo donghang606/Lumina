@@ -58,7 +58,7 @@ app.post('/api/agent/chat', express.json({ limit: '5mb' }), async (req, res) => 
       { message: body.message ?? '', conversationId: body.conversationId, resume: body.resume },
       send,
     )
-    send({ type: 'done', payload: { conversationId: result.conversationId, reply: result.reply, pendingApproval: result.pendingApproval ?? null } })
+    send({ type: 'done', payload: { conversationId: result.conversationId, reply: result.reply, pendingApproval: result.pendingApproval ?? null, threadId: result.threadId } })
   } catch (e) {
     send({ type: 'error', payload: e instanceof Error ? e.message : String(e) })
   } finally {

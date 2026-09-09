@@ -100,7 +100,7 @@ export async function runAgentTurn(ctx: Context, options: RunOptions, emit: (e: 
     await ctx.db.insert(messages).values({ id: randomUUID(), conversationId, role: 'assistant', content: reply, createdAt: new Date().toISOString() })
     await ctx.db.update(conversations).set({ updatedAt: new Date().toISOString() }).where(eq(conversations.id, conversationId)).run()
 
-    emit({ type: 'done', payload: { conversationId, reply } })
+    emit({ type: 'done', payload: { conversationId, reply, threadId } })
     return { conversationId, threadId, reply, pendingApproval, events: [] }
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e)

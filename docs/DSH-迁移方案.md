@@ -5,6 +5,11 @@
 > 决策依据：用户明确选择"整体迁移到 DSH 插件架构"、"先出迁移方案文档"。
 >
 > ⚠️ **2026-08-20 更新**：经评估，当前优先实施 **方案 2（DSH 仅作 AI 内核接入，见 `docs/DSH-AI内核接入方案.md`）**，保留现有栈零改动、1-2 周见效。本方案降级为备选长线路线——方案 2 验证 DSH 能力边界后，若需完整 Agent UI/插件市场再启动。
+>
+> 🛠 **2026-08-24 修正**：对照 DSH 实际安装（`@deepseek-ai/*` 0.1.1-rc.2）与 Lumina 源码核验后，修正 3 处：
+> 1. **§4.1** `session-query-sqlite` 先例重述：它证明 node:sqlite 可用，但保留完整主关系库是超出先例的新用法，需 PoC 验证并发/迁移语义。
+> 2. **§5.2** UI 路径 A 机制重写：DSH slot 不能挂独立路由页，正确做法是 Host 插件注册自定义 HTTP 路由（`ctx.webServer.register`）服务独立 SPA bundle，与官方 Agent UI 并行。
+> 3. **§7/§8** embedding 风险升级：`ctx.llm` 公开 API **无任何 embedding 接口**，必须永久保留自建 `/embeddings` 端点，不存在"待 PoC 决定"，决策点 #2 已关闭。
 
 ---
 
@@ -106,14 +111,14 @@ Lumina 当前是自建全栈：Express 5 + tRPC 11 + Drizzle + libSQL 单文件�
 
 ### 4.1 方案 A：自开 sqlite（推荐）
 
-Lumina 的查询（BM25 排序、feed 过滤、图谱度数统计、like 反链）严重依赖 SQL。DSH storage 仅 KV，**无法承载**。官方已有先例：`session-query-sqlite` 插件自开 node:sqlite 连接。
+Lumina 的查询（BM25 排序、feed 过滤、图谱度数统计、like 反链）严重依赖 SQL。DSH storage 仅 KV，**无法承载**。DSH 官方插件 `session-query-sqlite` 证明 node:sqlite 在 Host 进程内可导入可用（FTS5 派生索引），但**保留完整主关系库是超出该先例的新用法**——后者明确禁止指向持久化主库，且不承担写入并发/LWW 同步语义。
 
 - 插件 `lumina-storage` 用 `node:sqlite` 打开 `$DSH_HOME/profiles/<name>/lumina.db`
 - **原 17 表结构原样保留**（`CREATE TABLE IF NOT EXISTS` + 增量列迁移），只迁移连接层
 - `ctx.storage` 域仅用于轻量配置（provider 设置、布局），重数据走 sqlite
 - 数据迁移：Lumina 现有 `lumina.db` 文件直接拷贝到 profile 目录即可（同格式）
 
-**风险**：`node:sqlite` 在 Host 环境 Node ≥22.19 可用（DSH 要求）；不依赖 DSH storage 版本迁移语义。
+**风险**：`node:sqlite` 在 Host 环境 Node ≥22.5 可用（DSH 要求）；不依赖 DSH storage 版本迁移语义。保留完整主关系库 + LWW 写入并发是超出已有先例的新模式，需 PoC 验证启动性能、写入闸门和同步兼容性。
 
 ### 4.2 方案 B：DSH storage 域 + 自建查询
 
@@ -137,11 +142,13 @@ Lumina 的查询（BM25 排序、feed 过滤、图谱度数统计、like 反链�
 
 | 路径 | 做法 | 优劣 |
 |---|---|---|
-| A. 独立 web-runtime bundle | 自定义 bundle 挂一个"知识管理"入口，内部用自建 React 路由渲染 5 页面；官方 Agent UI 保留 | 迁移最快，UI 几乎不改；与官方 UI 双轨并存 |
+| A. 独立 SPA 路由（推荐） | Host 插件用 `ctx.webServer.register` 注册自定义 HTTP 路由（如 `/lumina/*`），服务一个自建 SPA bundle；官方 Agent UI 保留在 `/` | 迁移最快，UI 几乎不改；与官方 UI 双轨并行，灵活独立 |
 | B. 混入官方 slot | 笔记列表/编辑器注册进官方布局 slot | 符合 DSH 组合哲学，但 slot 能力不足以承载完整知识管理 UI，需大量适配 |
 | C. 替换 web-app | 用 Lumina UI 整个替换官方 web-app 的 shell | 放弃官方 Agent UI 的会话界面，Agent 能力降级为服务 |
 
-> **建议 PoC 验证路径 A**：`lumina-web-client` 包同时带 `dsh.client` 清单，在官方 web-app 挂一个"Lumina"导航入口，内部独立渲染。验证 slot 注入能否承载完整页面。
+> **关键澄清**：DSH 客户端的 slot 系统是组件级注入（`register({name,children,store,inject}, Component)`），**插件不能定义独立路由页**。路径 A 的正确做法不是 slot 注入，而是 **Host 插件注册自定义 HTTP 路由 + 独立 SPA**。这完全可行（`dsh-host-webserver` 的 `register(route)` 支持 exact/prefix 路由；`registerFallback` + `tapIndex` 可做 index 注入/SPA fallback）。方案 §2 架构图"独立 bundle（cordis patch 层）挂载自定义 web-runtime 页面"的表述应更新为此机制。
+>
+> **PoC 应验证**：`lumina-web-client` 作为独立 SPA bundle 通过 `ctx.webServer.register` 挂载，`/lumina` 返回完整页面，`/lumina/notes` 等子路由在 SPA 内自管理。验证 `dsh-web-app` 的官方 Agent UI 与 `/lumina` 并行无冲突。
 
 ---
 
@@ -154,7 +161,7 @@ Lumina 的查询（BM25 排序、feed 过滤、图谱度数统计、like 反链�
 - [ ] 验证三条关键假设：
   1. 插件能否自开 node:sqlite 并完整保留原表
   2. web bundle 能否承载完整 React 路由页面（含 d3、Tiptap 第三方库）
-  3. `ctx.llm` 能否替代自建 provider（含 embedding）
+  3. `ctx.llm` 能否替代自建 provider（对话/摘要 stream，**不包括 embedding**——`ctx.llm` 无 embedding 接口）
 
 **PoC 通过标准**：在 DSH Desktop 里打开自定义"笔记"页面，能列出并编辑原库笔记，AI 摘要可用。
 
@@ -166,7 +173,7 @@ Lumina 的查询（BM25 排序、feed 过滤、图谱度数统计、like 反链�
 
 ### Phase 2 — 图谱 / AI / 审核（2 周）
 - [ ] `lumina-web-client`：GraphPage（d3）、TimelinePage bundle
-- [ ] `lumina-rag`：混合检索迁移 + embedding（接 `ctx.llm` 或保留自建 embed 端点）
+- [ ] `lumina-rag`：混合检索迁移 + **embedding 永久保留自建端点**（`ctx.llm` 无 embedding 接口，向量检索必须自建）
 - [ ] 审核队列：autoProcess → ai_suggestions → review 全链路
 - [ ] RAG 问答迁到 DSH LLM（获得流式输出）
 
@@ -191,7 +198,7 @@ Lumina 的查询（BM25 排序、feed 过滤、图谱度数统计、like 反链�
 |---|---|---|
 | web bundle 承载完整 React 路由页面可能受限（DSH 客户端 slot 体系只为区块设计） | **高** | Phase 0 优先验证；失败则转路径 C（替换 web-app shell） |
 | DSH 固定上游版本，`node:sqlite`/Tiptap/d3 依赖可能与其构建基线冲突 | 中 | PoC 验证第三方库可被 bundle 引入（平台 externals 隐式生效） |
-| `ctx.llm` embedding 能力不确定（LLM 层是 stream 契约，embedding 需自建适配） | 中 | 保留 Lumina 自有 /embeddings 调用，仅对话/摘要走 DSH LLM |
+| `ctx.llm` 公开 API **无 embedding 接口**（LLM 层只有 stream/complete，无 embed 方法），embedding 必须永久自建 | **高** | 保留 Lumina 自有 `/embeddings` 端点，仅对话/摘要走 DSH LLM；纯向量检索（混合检索中的向量余弦）仍由自建栈完成 |
 | 知识管理 UI 与官方 Agent UI 并存，体验割裂 | 中 | 路径 A 设计统一导航；不行则路径 C |
 | DSH Desktop 是社区项目，上游变动快 | 中 | 固定 pin 版本（仓库已 pin 上游 submodule） |
 | MCP server 与 DSH MCP client 共存需注意端口/路由冲突 | 低 | lumina-mcp 挂独立路径 `/lumina/mcp` |
@@ -202,7 +209,7 @@ Lumina 的查询（BM25 排序、feed 过滤、图谱度数统计、like 反链�
 ## 8. 决策点（待确认）
 
 1. **UI 路径**：A（独立 bundle 双轨）vs C（替换官方 web-app shell）→ PoC 决定
-2. **embedding**：走 DSH LLM 适配 vs 保留 Lumina 自有 /embeddings 端点 → PoC 决定
+2. **embedding**：~~走 DSH LLM 适配 vs 保留 Lumina 自有 /embeddings 端点~~ → **已关闭**。`ctx.llm` 公开 API 无任何 embedding 接口，必须永久保留自建 `/embeddings` 端点，不存在走 DSH LLM 的选项。
 3. **web 形态去留**：迁移完成后，Lumina 自建 tRPC 栈是删除还是保留为"web 轻量版"
 4. **AI Provider**：全部迁到 DSH adapter，还是允许 lumina-core 同时维护自建 provider 作为 fallback
 5. **数据库位置**：沿用现有 lumina.db 文件，还是迁入 DSH profile 目录统一管理

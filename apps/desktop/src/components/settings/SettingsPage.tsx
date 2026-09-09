@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Typography, Form, Input, Select, Switch, Button, Tabs, Table, Message, Space, Modal, Tag } from '@arco-design/web-react'
-import { Settings as SettingsIcon, Plus, Zap, Server, Palette, Sparkles, BrainCircuit, RefreshCw, Trash2, Database, Mic, Globe } from 'lucide-react'
+import { Settings as SettingsIcon, Plus, Zap, Server, Palette, Sparkles, BrainCircuit, RefreshCw, Trash2, Database, Mic, Globe, TerminalSquare } from 'lucide-react'
 import { configService } from '../../services/configService'
 import { aiService } from '../../services/aiService'
 import { noteService } from '../../services/noteService'
 import { mcpService } from '../../services/mcpService'
+import { harnessService, type HarnessStatus } from '../../services/harnessService'
 import { transferService, type ExportItem } from '../../services/transferService'
 import { setServerUrl, getServerUrlRaw } from '../../lib/trpc'
 import { parseMarkdown, toMarkdown, sanitizeFilename } from '../../lib/markdown'
@@ -35,9 +36,35 @@ export default function SettingsPage() {
   const [testing, setTesting] = useState(false)
   const [embedding, setEmbedding] = useState(false)
   const [mcpTools, setMcpTools] = useState<string>('')
+  const [harness, setHarness] = useState<HarnessStatus | null>(null)
+  const [harnessBusy, setHarnessBusy] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [importing, setImporting] = useState(false)
   const importRef = useRef<HTMLInputElement>(null)
+
+  const refreshHarness = async () => {
+    try {
+      setHarness(await harnessService.status())
+    } catch {
+      /* server 不可达时保留旧状态 */
+    }
+  }
+
+  useEffect(() => {
+    void refreshHarness()
+  }, [reload])
+
+  const harnessAction = async (fn: () => Promise<HarnessStatus>, success?: string) => {
+    setHarnessBusy(true)
+    try {
+      setHarness(await fn())
+      if (success) Message.success(success)
+    } catch (e) {
+      Message.error(e instanceof Error ? e.message : String(e))
+    } finally {
+      setHarnessBusy(false)
+    }
+  }
   const { setSkin } = useTheme()
   const [serverUrlLocal, setServerUrlLocal] = useState(getServerUrlRaw)
   const [sttEnabled, setSttEnabled] = useState(false)
@@ -684,6 +711,50 @@ export default function SettingsPage() {
                 },
               ]}
             />
+          </Glass>
+        </Tabs.TabPane>
+        <Tabs.TabPane key="harness" title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><TerminalSquare size={13} /> DeepSeek Harness</span>}>
+          <Glass style={{ padding: 'var(--sp-5)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--sp-4)' }}>
+              <div>
+                <div className="lumina-label">Agent 内核（DSH Sidecar）</div>
+                <Text type="secondary" style={{ fontSize: 'var(--text-sm)' }}>
+                  启动本地 DeepSeek Harness 编码 Agent，通过 MCP 桥调用 Lumina 笔记工具（搜索/建笔记/图谱/视图）。模型走当前默认 AI Provider。
+                </Text>
+              </div>
+              <Space>
+                {harness?.status !== 'ready' ? (
+                  <Button size="small" type="primary" loading={harnessBusy} disabled={harnessBusy} onClick={() => void harnessAction(() => harnessService.start(), 'Harness 已启动')}>
+                    启动
+                  </Button>
+                ) : (
+                  <>
+                    <Button size="small" onClick={() => harness?.url && window.open(harness.url, '_blank')}>
+                      打开 Agent UI
+                    </Button>
+                    <Button size="small" status="danger" loading={harnessBusy} disabled={harnessBusy} onClick={() => void harnessAction(() => harnessService.stop(), 'Harness 已停止')}>
+                      停止
+                    </Button>
+                  </>
+                )}
+                <Button size="small" type="text" icon={<RefreshCw size={12} />} onClick={() => void refreshHarness()} />
+              </Space>
+            </div>
+            {harness && (
+              <Space size={12} style={{ marginBottom: 'var(--sp-3)' }}>
+                <Tag color={harness.status === 'ready' ? 'green' : harness.status === 'error' || harness.status === 'config-required' ? 'red' : 'blue'}>
+                  {harness.status}
+                </Tag>
+                {harness.model && <Tag>{harness.model.providerLabel} · {harness.model.modelName}</Tag>}
+                {harness.url && <Text copyable style={{ fontSize: 'var(--text-sm)' }}>{harness.url}</Text>}
+              </Space>
+            )}
+            {harness?.error && (
+              <div style={{ color: 'var(--danger, #e5735f)', fontSize: 'var(--text-sm)', whiteSpace: 'pre-wrap' }}>{harness.error}</div>
+            )}
+            {harness?.status === 'config-required' && (
+              <Text type="secondary" style={{ fontSize: 'var(--text-sm)' }}>请先在「AI Providers」标签页配置并选择一个可用模型。</Text>
+            )}
           </Glass>
         </Tabs.TabPane>
         <Tabs.TabPane key="data" title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Database size={13} /> 数据</span>}>

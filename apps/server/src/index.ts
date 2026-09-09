@@ -17,14 +17,19 @@ const PORT = 3001
 app.use(cors())
 app.use('/trpc', createExpressMiddleware({ router: appRouter, createContext }))
 
-const luminaMcp = createLuminaMcpServer(db)
-const mcpTransport = createLuminaMcpTransport()
-app.get('/mcp', (req, res) => {
-  mcpTransport.handleRequest(req, res)
-})
-app.post('/mcp', express.json({ limit: '10mb' }), (req, res) => {
-  mcpTransport.handleRequest(req, res, req.body)
-})
+// 无状态模式：每个 HTTP 请求独立 server+transport（官方无状态写法，支持任意 MCP 客户端并发连接）
+const handleMcp = async (req: import('express').Request, res: import('express').Response, body?: unknown) => {
+  const server = createLuminaMcpServer(db)
+  const transport = createLuminaMcpTransport()
+  try {
+    await server.connect(transport)
+    await transport.handleRequest(req, res, body)
+  } catch (e) {
+    if (!res.headersSent) res.status(500).json({ error: e instanceof Error ? e.message : String(e) })
+  }
+}
+app.get('/mcp', (req, res) => handleMcp(req, res))
+app.post('/mcp', express.json({ limit: '10mb' }), (req, res) => handleMcp(req, res, req.body))
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }))
 
@@ -92,7 +97,6 @@ app.post('/api/voice', express.json({ limit: '25mb' }), async (req, res) => {
 })
 
 initDb().then(async () => {
-  await luminaMcp.connect(mcpTransport)
   app.listen(PORT, () => {
     console.log(`[Lumina Server] http://localhost:${PORT}`)
   })

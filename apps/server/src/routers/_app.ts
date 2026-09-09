@@ -13,6 +13,7 @@ import { viewRouter } from './view.js'
 import { syncRouter } from './sync.js'
 import { reviewRouter } from './review.js'
 import { bookmarkRouter } from './bookmark.js'
+import { harnessRouter } from './harness.js'
 
 export const appRouter = router({
   note: noteRouter,
@@ -29,6 +30,7 @@ export const appRouter = router({
   sync: syncRouter,
   review: reviewRouter,
   bookmark: bookmarkRouter,
+  harness: harnessRouter,
 })
 
 export type AppRouter = typeof appRouter

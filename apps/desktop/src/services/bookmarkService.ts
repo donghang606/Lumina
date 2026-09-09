@@ -7,7 +7,7 @@ export interface BookmarkHealthItem {
   url: string
   ok: boolean
   status: number
-  error: string | null
+  error?: string | null
 }
 
 export const bookmarkService = {

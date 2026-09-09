@@ -5,6 +5,34 @@ import { randomUUID } from 'node:crypto'
 import { eq, or, sql, desc, inArray } from 'drizzle-orm'
 import { embedTexts, cosineSimilarity, getActiveProvider } from '../llm/provider.js'
 import { bm25Score, fuseRanks, rankByScores, type SearchableDoc } from '../lib/hybridSearch.js'
+import { insertChunks, deleteNoteChunks, searchChunks } from '../lib/vectorstore.js'
+
+/**
+ * 块索引统一管道：libSQL BLOB（source of truth）+ Zvec HNSW 双写。
+ * Zvec 失败不影响主流程（回退 BLOB 暴力余弦仍可用）。
+ */
+async function indexNoteChunks(ctx: { db: typeof import('../db/client.js').db }, noteId: string, chunks: string[], vectors: number[][]): Promise<void> {
+  await ctx.db.delete(noteBlocks).where(eq(noteBlocks.noteId, noteId)).run()
+  await ctx.db.insert(noteBlocks).values(
+    chunks.map((c, i) => ({
+      id: randomUUID(),
+      noteId,
+      index: i,
+      chunkContent: c,
+      embedding: Buffer.from(Float64Array.from(vectors[i] ?? []).buffer),
+      tokenCount: Math.round(c.length / 4),
+    })),
+  )
+  const dim = vectors[0]?.length ?? 0
+  if (dim > 0) {
+    try {
+      deleteNoteChunks(dim, noteId)
+      insertChunks(dim, chunks.map((c, i) => ({ id: `nb-${noteId}-${i}`, noteId, chunkIndex: i, content: c, embedding: vectors[i] ?? [] })))
+    } catch {
+      // Zvec best-effort：失败保留 BLOB 检索路径
+    }
+  }
+}
 
 const noteUpdateSchema = z.object({
   id: z.string(),
@@ -72,6 +100,19 @@ export const noteRouter = router({
 
   remove: publicProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
     const now = new Date().toISOString()
+    // 清理各维度 Zvec collection 中的块（best-effort）
+    try {
+      const { listDimensions } = await import('../lib/vectorstore.js')
+      for (const dim of listDimensions()) {
+        try {
+          deleteNoteChunks(dim, input.id)
+        } catch {
+          /* 该维度 collection 已不可用 */
+        }
+      }
+    } catch {
+      /* zvec 不可用 */
+    }
     await ctx.db.delete(notes).where(eq(notes.id, input.id)).run()
     await ctx.db
       .insert(noteTombstones)
@@ -230,19 +271,9 @@ export const noteRouter = router({
           const CHUNK = 700
           const chunks: string[] = []
           for (let i = 0; i < clean.length; i += CHUNK) chunks.push(clean.slice(i, i + CHUNK))
-          await ctx.db.delete(noteBlocks).where(eq(noteBlocks.noteId, input.noteId)).run()
           const vectors = await embedTexts(ctx, chunks, { task: 'embed' })
-          if (vectors.length && vectors[0].length) {
-            await ctx.db.insert(noteBlocks).values(
-              chunks.map((c, i) => ({
-                id: randomUUID(),
-                noteId: input.noteId,
-                index: i,
-                chunkContent: c,
-                embedding: Buffer.from(Float64Array.from(vectors[i]).buffer),
-                tokenCount: Math.round(c.length / 4),
-              })),
-            )
+          if (vectors.length && vectors[0]?.length) {
+            await indexNoteChunks(ctx, input.noteId, chunks, vectors)
           }
         } catch {
           // no provider — skip rag
@@ -390,18 +421,8 @@ export const noteRouter = router({
     for (let i = 0; i < clean.length; i += CHUNK) chunks.push(clean.slice(i, i + CHUNK))
     if (chunks.length === 0) return { ok: false, reason: 'no chunks' }
 
-    await ctx.db.delete(noteBlocks).where(eq(noteBlocks.noteId, input.id)).run()
     const vectors = await embedTexts(ctx, chunks, { task: 'embed' })
-    await ctx.db.insert(noteBlocks).values(
-      chunks.map((c, i) => ({
-        id: randomUUID(),
-        noteId: input.id,
-        index: i,
-        chunkContent: c,
-        embedding: Buffer.from(Float64Array.from(vectors[i] ?? []).buffer),
-        tokenCount: Math.round(c.length / 4),
-      })),
-    )
+    await indexNoteChunks(ctx, input.id, chunks, vectors)
     return { ok: true, chunks: chunks.length, noteTitle: row.title }
   }),
 
@@ -419,17 +440,7 @@ export const noteRouter = router({
       if (!chunks.length) continue
       try {
         const vectors = await embedTexts(ctx, chunks, { task: 'embed' })
-        await ctx.db.delete(noteBlocks).where(eq(noteBlocks.noteId, row.id)).run()
-        await ctx.db.insert(noteBlocks).values(
-          chunks.map((c, i) => ({
-            id: randomUUID(),
-            noteId: row.id,
-            index: i,
-            chunkContent: c,
-            embedding: Buffer.from(Float64Array.from(vectors[i] ?? []).buffer),
-            tokenCount: Math.round(c.length / 4),
-          })),
-        )
+        await indexNoteChunks(ctx, row.id, chunks, vectors)
         embedded++
       } catch {
         // skip note on failure
@@ -461,37 +472,41 @@ export const noteRouter = router({
         }
       }
 
-      // 语义向量检索
+      // 语义向量检索（Zvec HNSW 优先，失败/为空回退 BLOB 暴力余弦）
       let semanticRank = new Map<string, number>()
       let semanticScores = new Map<string, number>()
       try {
-        const blocks = await ctx.db.select().from(noteBlocks).all()
         const vector = (await embedTexts(ctx, [input.query], { task: 'embed' }))[0]
         if (!vector || vector.length === 0) throw new Error('no query vector')
 
-        const scored: { noteId: string; chunkContent: string; title: string; sim: number }[] = []
-        for (const b of blocks) {
-          if (!b.embedding) continue
-          const buf = b.embedding as unknown as Uint8Array
-          const stored = new Float64Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength))
-          const vec = Array.from(stored)
-          if (vec.length !== vector.length) continue
-          const sim = cosineSimilarity(vector, vec)
-          const note = rows.find((n) => n.id === b.noteId)
-          scored.push({ noteId: b.noteId as string, chunkContent: b.chunkContent, title: note?.title ?? '(无标题)', sim })
+        let perNote = new Map<string, { noteId: string; sim: number }>()
+        const zvecHits = await searchChunks(vector.length, vector, input.limit * 3).catch(() => null)
+        if (zvecHits && zvecHits.length > 0) {
+          for (const h of zvecHits) {
+            const cur = perNote.get(h.noteId)
+            if (!cur || h.score > cur.sim) perNote.set(h.noteId, { noteId: h.noteId, sim: h.score })
+          }
+        } else {
+          const blocks = await ctx.db.select().from(noteBlocks).all()
+          const scored: { noteId: string; sim: number }[] = []
+          for (const b of blocks) {
+            if (!b.embedding) continue
+            const buf = b.embedding as unknown as Uint8Array
+            const stored = new Float64Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength))
+            const vec = Array.from(stored)
+            if (vec.length !== vector.length) continue
+            scored.push({ noteId: b.noteId as string, sim: cosineSimilarity(vector, vec) })
+          }
+          scored.sort((a, b) => b.sim - a.sim)
+          const threshold = Math.max(0.15, (scored[0]?.sim ?? 0) * 0.6)
+          for (const s of scored.filter((x) => x.sim >= threshold)) {
+            const cur = perNote.get(s.noteId)
+            if (!cur || s.sim > cur.sim) perNote.set(s.noteId, s)
+          }
         }
-        scored.sort((a, b) => b.sim - a.sim)
 
-        const threshold = Math.max(0.15, (scored[0]?.sim ?? 0) * 0.6)
-        const above = scored.filter((s) => s.sim >= threshold)
-        const perNote = new Map<string, { noteId: string; chunkContent: string; sim: number }>()
-        for (const s of above) {
-          const cur = perNote.get(s.noteId)
-          if (!cur || s.sim > cur.sim) perNote.set(s.noteId, s)
-        }
-        const noteScores = [...perNote.values()]
-        const topBySim = [...noteScores].sort((a, b) => b.sim - a.sim)
-        semanticRank = rankByScores(topBySim, (s) => s.sim)
+        const noteScores = [...perNote.values()].sort((a, b) => b.sim - a.sim)
+        semanticRank = rankByScores(noteScores, (s) => s.sim)
         for (const s of noteScores) semanticScores.set(s.noteId, s.sim)
       } catch {
         // 语义不可用时退回纯 BM25

@@ -60,27 +60,41 @@ export const aiRouter = router({
         .limit(50)
         .all()
 
-      // Semantic RAG search (falls back to keyword when no provider / no vectors).
+      // Semantic RAG search (Zvec HNSW first, fallback to BLOB brute-force cosine, then keyword).
       // Returns structured sources so the frontend can show retrievable citations.
       let sources: { noteId: string; title: string; content: string; score: number }[] = []
       try {
         const r = await ctx.db.select().from(notes).all()
-        const blocks = await ctx.db.select().from(noteBlocks).all()
-        if (blocks.some((b) => b.embedding)) {
         const { embedTexts, cosineSimilarity } = await import('../llm/provider.js')
-          const vector = (await embedTexts(ctx, [q], { task: 'embed' }))[0]
-          if (vector?.length) {
-            const scored = blocks
-              .filter((b) => b.embedding)
-              .map((b) => {
-                const buf = b.embedding as unknown as Uint8Array
-                const stored = new Float64Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength))
-                const note = r.find((n) => n.id === b.noteId)
-                return { noteId: b.noteId as string, title: note?.title ?? '(无标题)', content: b.chunkContent, score: cosineSimilarity(vector, Array.from(stored)) }
+        const vector = (await embedTexts(ctx, [q], { task: 'embed' }))[0]
+        if (vector?.length) {
+          // 1) Zvec HNSW top-k
+          const { searchChunks } = await import('../lib/vectorstore.js')
+          const zvecHits = await searchChunks(vector.length, vector, 6).catch(() => null)
+          if (zvecHits && zvecHits.length > 0) {
+            sources = zvecHits
+              .map((h) => {
+                const note = r.find((n) => n.id === h.noteId)
+                return { noteId: h.noteId, title: note?.title ?? '(无标题)', content: h.content, score: h.score }
               })
-              .sort((a, b) => b.score - a.score)
-              .slice(0, 6)
-            if (scored[0]?.score && scored[0].score > 0.15) sources = scored
+              .filter((s) => s.score > 0.15)
+          }
+          // 2) Fallback: BLOB brute-force cosine
+          if (sources.length === 0) {
+            const blocks = await ctx.db.select().from(noteBlocks).all()
+            if (blocks.some((b) => b.embedding)) {
+              const scored = blocks
+                .filter((b) => b.embedding)
+                .map((b) => {
+                  const buf = b.embedding as unknown as Uint8Array
+                  const stored = new Float64Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength))
+                  const note = r.find((n) => n.id === b.noteId)
+                  return { noteId: b.noteId as string, title: note?.title ?? '(无标题)', content: b.chunkContent, score: cosineSimilarity(vector, Array.from(stored)) }
+                })
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 6)
+              if (scored[0]?.score && scored[0].score > 0.15) sources = scored
+            }
           }
         }
       } catch {

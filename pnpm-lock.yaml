@@ -174,6 +174,9 @@ importers:
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@5.9.3)
+      '@zvec/zvec':
+        specifier: ^0.7.1
+        version: 0.7.1
       cors:
         specifier: ^2.8.6
         version: 2.8.6
@@ -217,6 +220,9 @@ importers:
       '@types/turndown':
         specifier: ^5.0.6
         version: 5.0.6
+      '@zvec/bindings-darwin-arm64':
+        specifier: ^0.7.1
+        version: 0.7.1
       drizzle-kit:
         specifier: ^0.30.0
         version: 0.30.6
@@ -4493,6 +4499,53 @@ packages:
 
   '@wxt-dev/storage@1.2.9':
     resolution: {integrity: sha512-dh9TJwvLBM2x4wyy9nE7eYE3wA8pgz1TXSyz7RbdjkJxLfFfWkbeIqiU7VkGy7Vx8sJBmQjoSpk9zSUb3Bjy0Q==}
+
+  '@zvec/bindings-darwin-arm64@0.7.1':
+    resolution: {integrity: sha512-9wHi3Amc6sT311aIJHMz2cEofldKM7HF2Lj5/GdgCyfm6iKAA0ApxK3sufWN3VpUTI3b9bqxbq1l22eS6nHnrQ==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@zvec/bindings-darwin-x64@0.7.1':
+    resolution: {integrity: sha512-T/lz+Me87WoCUiYOW0ghke8sYxlwEeco2pa/FlRP/QYESEwuqnQij17A3oWXxvqp3WdVi4Zt63KrRZw4dduYJw==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@zvec/bindings-linux-arm64-musl@0.7.1':
+    resolution: {integrity: sha512-gTH80KhojeT7swxdqQFNz3Ew1lUGKxjMlSt6ESPqVRFWcNIU+f3F+7YmMubZrQUyiNWXjnexp7VCkPl/nOa2Hg==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@zvec/bindings-linux-arm64@0.7.1':
+    resolution: {integrity: sha512-1v2vVL6CYfIXyYkYMmN1VD6YfZhNNuGXPH6LUex/xlAlWhENA1cS5N4wCQN0xQzenSN7pqTnZrzxpI8DDdweIg==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@zvec/bindings-linux-x64-musl@0.7.1':
+    resolution: {integrity: sha512-XFWhcVr0mFXfN2SYCZg9eNx7eTK9w/n3V4dZMV15lHepRuItRpXyaXV6/8Sf1Zmr7LJBGocnOArwVqWJqS99gg==}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@zvec/bindings-linux-x64@0.7.1':
+    resolution: {integrity: sha512-qwLMZlaRytAj7g7YXOfMWyais5zWbKrUeeLjby0Gaim4ha3aRQXbv7oUXcRBug35rogPhulrSlFkx+gHLIppyw==}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@zvec/bindings-win32-arm64@0.7.1':
+    resolution: {integrity: sha512-qAF4Oj9py5GVz079TUXi+kaXJW4pIYAg0eoFssUf7ZfX8VsDixTUK/DLnp5bdta2Isj6mBU1tOxlzyqn7aBrKA==}
+    cpu: [arm64]
+    os: [win32]
+
+  '@zvec/bindings-win32-x64@0.7.1':
+    resolution: {integrity: sha512-iPJHeacfuaLbduihwr6oQKic5laTL/RQx1LbcnuopshJ3ISxcSLLHhg16I8sEAKhYM9I3uFG8CsCdmJIYLi8sw==}
+    cpu: [x64]
+    os: [win32]
+
+  '@zvec/zvec@0.7.1':
+    resolution: {integrity: sha512-uzaSjlLukTiczMP1OhTBmofQXFcidvfTv1tUl3+KAaSPxG5rRiirMzvJooun5q7z3R3ggnrOSM12BnA2L6i1PQ==}
 
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
@@ -11796,6 +11849,42 @@ snapshots:
     dependencies:
       '@wxt-dev/browser': 0.2.5
       superlock: 1.3.5
+
+  '@zvec/bindings-darwin-arm64@0.7.1': {}
+
+  '@zvec/bindings-darwin-x64@0.7.1':
+    optional: true
+
+  '@zvec/bindings-linux-arm64-musl@0.7.1':
+    optional: true
+
+  '@zvec/bindings-linux-arm64@0.7.1':
+    optional: true
+
+  '@zvec/bindings-linux-x64-musl@0.7.1':
+    optional: true
+
+  '@zvec/bindings-linux-x64@0.7.1':
+    optional: true
+
+  '@zvec/bindings-win32-arm64@0.7.1':
+    optional: true
+
+  '@zvec/bindings-win32-x64@0.7.1':
+    optional: true
+
+  '@zvec/zvec@0.7.1':
+    dependencies:
+      detect-libc: 2.1.2
+    optionalDependencies:
+      '@zvec/bindings-darwin-arm64': 0.7.1
+      '@zvec/bindings-darwin-x64': 0.7.1
+      '@zvec/bindings-linux-arm64': 0.7.1
+      '@zvec/bindings-linux-arm64-musl': 0.7.1
+      '@zvec/bindings-linux-x64': 0.7.1
+      '@zvec/bindings-linux-x64-musl': 0.7.1
+      '@zvec/bindings-win32-arm64': 0.7.1
+      '@zvec/bindings-win32-x64': 0.7.1
 
   accepts@2.0.0:
     dependencies:

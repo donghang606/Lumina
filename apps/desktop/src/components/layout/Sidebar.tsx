@@ -15,6 +15,7 @@ import {
   FileText,
   Ghost,
   History,
+  Calendar,
 } from 'lucide-react'
 import { useNoteStore } from '../../stores/noteStore'
 import { useLayoutStore, type NavKey } from '../../stores/layoutStore'
@@ -27,6 +28,7 @@ const navItems: { key: NavKey; label: string; Icon: typeof LayoutDashboard }[] =
   { key: 'notes', label: '笔记', Icon: StickyNote },
   { key: 'graph', label: '图谱', Icon: Network },
   { key: 'timeline', label: '时间线', Icon: History },
+  { key: 'schedule', label: '日程', Icon: Calendar },
   { key: 'settings', label: '设置', Icon: Settings },
 ]
 

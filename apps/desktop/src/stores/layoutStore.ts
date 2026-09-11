@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type NavKey = 'feed' | 'notes' | 'graph' | 'timeline' | 'settings'
+export type NavKey = 'feed' | 'notes' | 'graph' | 'timeline' | 'schedule' | 'settings'
 
 interface LayoutState {
   nav: NavKey

@@ -63,7 +63,8 @@ export async function createLuminaAgent(ctx: Context, options: { unattended?: bo
       '- 直接创建笔记（create_note：需审批，仅在用户明确要求时用）\n' +
       '- 标签管理（list_tags / set_tags，写操作需审批）\n' +
       '- 知识图谱（get_graph）与查询视图（run_query_view）\n' +
-      '- 笔记库统计（get_note_stats / list_recent）\n\n' +
+      '- 笔记库统计（get_note_stats / list_recent）\n' +
+      '- 日程管理（list_events / create_event / get_event / delete_event；建/删需审批，适合"提醒我""安排"类请求）\n\n' +
       '## 文件沙箱\n' +
       `Agent 工作区根目录：${rootDir}（虚拟路径 /）\n` +
       '- /SANDBOX/：Agent 生成的文件（write_file 等）必须存放于此\n' +

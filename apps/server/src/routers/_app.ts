@@ -16,6 +16,7 @@ import { bookmarkRouter } from './bookmark.js'
 import { harnessRouter } from './harness.js'
 import { agentRouter } from './agent.js'
 import { ingestRouter } from './ingest.js'
+import { scheduleRouter } from './schedule.js'
 
 export const appRouter = router({
   note: noteRouter,
@@ -35,6 +36,7 @@ export const appRouter = router({
   harness: harnessRouter,
   agent: agentRouter,
   ingest: ingestRouter,
+  schedule: scheduleRouter,
 })
 
 export type AppRouter = typeof appRouter

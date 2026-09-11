@@ -185,3 +185,19 @@ export const fileIngests = sqliteTable('file_ingests', {
   noteId: text('note_id').references(() => notes.id, { onDelete: 'cascade' }),
   ingestedAt: text('ingested_at').notNull(),
 })
+
+/** 日程事件：HFL 借鉴的字段结构（title/start/end/allDay/description/color/priority） */
+export const scheduleEvents = sqliteTable('schedule_events', {
+  id: text('id').primaryKey(),
+  title: text('title').notNull().default(''),
+  start: text('start').notNull().default(''),
+  end: text('end').notNull().default(''),
+  startTime: text('start_time').notNull().default(''),
+  endTime: text('end_time').notNull().default(''),
+  allDay: integer('all_day', { mode: 'boolean' }).notNull().default(false),
+  description: text('description').notNull().default(''),
+  color: text('color').notNull().default('#60a5fa'),
+  priority: text('priority', { enum: ['important', 'normal', 'low'] }).notNull().default('important'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})

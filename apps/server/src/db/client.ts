@@ -148,6 +148,21 @@ export async function initDb(c = client) {
     FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
   )`)
 
+  await sql.execute(`CREATE TABLE IF NOT EXISTS schedule_events (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL DEFAULT '',
+    start TEXT NOT NULL DEFAULT '',
+    end TEXT NOT NULL DEFAULT '',
+    start_time TEXT NOT NULL DEFAULT '',
+    end_time TEXT NOT NULL DEFAULT '',
+    all_day INTEGER NOT NULL DEFAULT 0,
+    description TEXT NOT NULL DEFAULT '',
+    color TEXT NOT NULL DEFAULT '#60a5fa',
+    priority TEXT NOT NULL DEFAULT 'important',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`)
+
   await migrateLegacyApiKeys(sql)
 }
 

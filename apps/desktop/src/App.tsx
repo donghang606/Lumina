@@ -8,6 +8,7 @@ import NotesPage from './components/notes/NotesPage'
 import GraphPage from './components/graph/GraphPage'
 import TimelinePage from './components/timeline/TimelinePage'
 import SettingsPage from './components/settings/SettingsPage'
+import SchedulePage from './components/pages/SchedulePage'
 import { useLayoutStore } from './stores/layoutStore'
 import { useTheme } from './hooks/useTheme'
 import UiButton from './components/ui/UiButton'
@@ -18,6 +19,7 @@ function CurrentPage() {
   if (nav === 'notes') return <NotesPage />
   if (nav === 'graph') return <GraphPage />
   if (nav === 'timeline') return <TimelinePage />
+  if (nav === 'schedule') return <SchedulePage />
   return <SettingsPage />
 }
 

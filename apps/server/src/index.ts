@@ -1,5 +1,6 @@
 import express from 'express'
 import cors from 'cors'
+import path from 'node:path'
 import { createExpressMiddleware } from '@trpc/server/adapters/express'
 import { appRouter } from './routers/_app.js'
 import { createContext } from './trpc/context.js'
@@ -13,7 +14,7 @@ import { createLuminaMcpServer, createLuminaMcpTransport } from './mcp/luminaSer
 import { runAgentTurn, type AgentEvent } from './agent/runner.js'
 
 const app = express()
-const PORT = 3001
+const PORT = Number(process.env.LUMINA_PORT ?? 3001)
 
 app.use(cors())
 app.use('/trpc', express.json({ limit: '10mb' }), createExpressMiddleware({ router: appRouter, createContext }))
@@ -128,9 +129,19 @@ app.post('/api/voice', express.json({ limit: '25mb' }), async (req, res) => {
   }
 })
 
+// Electron 生产模式：托管打包前端静态资源（LUMINA_WEB_DIST 指向 resources/web/dist）
+const webDist = process.env.LUMINA_WEB_DIST
+if (webDist) {
+  app.use(express.static(webDist))
+  // SPA fallback：非 /api / /trpc / /mcp / /health 请求回落 index.html
+  app.get(/^(?!\/(api|trpc|mcp|health)).*/, (_req, res) => {
+    res.sendFile(path.join(webDist, 'index.html'))
+  })
+}
+
 initDb().then(async () => {
-  app.listen(PORT, () => {
-    console.log(`[Lumina Server] http://localhost:${PORT}`)
+  app.listen(PORT, '127.0.0.1', () => {
+    console.log(`[Lumina Server] http://127.0.0.1:${PORT}`)
   })
 })
 

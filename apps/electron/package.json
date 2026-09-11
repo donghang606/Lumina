@@ -1,0 +1,24 @@
+{
+  "name": "@lumina/electron",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "tsup",
+    "dev": "node scripts/dev.mjs",
+    "start": "node scripts/dev.mjs --no-rebuild",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "package": "node scripts/dev.mjs --package"
+  },
+  "dependencies": {
+    "@lumina/server": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "electron": "^33.4.11",
+    "tsup": "^8",
+    "vitest": "^3"
+  }
+}

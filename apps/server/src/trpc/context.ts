@@ -1,6 +1,6 @@
 import { initTRPC } from '@trpc/server'
 import type { CreateExpressContextOptions } from '@trpc/server/adapters/express'
-import { db } from '../db/client'
+import { db } from '../db/client.js'
 
 export function createContext({ req, res }: CreateExpressContextOptions) {
   return { db, req, res }

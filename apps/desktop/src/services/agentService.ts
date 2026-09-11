@@ -1,5 +1,4 @@
-import { trpc } from '../lib/trpc'
-import { getServerUrlRaw } from '../lib/trpc'
+import { trpc, resolveServerBase } from '../lib/trpc'
 
 export interface AgentPendingApproval {
   toolCallId: string
@@ -46,7 +45,7 @@ export function streamAgentChat(
   signal?: AbortSignal,
 ): Promise<AgentChatResult> {
   return new Promise((resolve, reject) => {
-    const base = getServerUrlRaw().replace(/\/trpc\/?$/, '')
+    const base = resolveServerBase()
     void fetch(`${base}/api/agent/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

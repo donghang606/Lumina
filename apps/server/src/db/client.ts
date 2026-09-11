@@ -1,11 +1,15 @@
 import { createClient } from '@libsql/client'
 import { drizzle } from 'drizzle-orm/libsql'
-import * as schema from './schema'
+import * as schema from './schema.js'
 import path from 'node:path'
 import { homedir } from 'node:os'
 import { encryptSecret } from '../lib/secrets.js'
 
-const dbPath = path.join(homedir(), 'Library', 'Application Support', 'com.lumina.app', 'lumina.db')
+// 数据目录：优先 LUMINA_DATA_DIR（Electron userData / 自定义安装位置），否则回退 macOS 默认
+const dataDir = process.env.LUMINA_DATA_DIR
+  ? path.join(process.env.LUMINA_DATA_DIR, 'data')
+  : path.join(homedir(), 'Library', 'Application Support', 'com.lumina.app')
+const dbPath = path.join(dataDir, 'lumina.db')
 const dbDir = path.dirname(dbPath)
 import fs from 'node:fs'
 if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true })

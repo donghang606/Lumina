@@ -1,0 +1,32 @@
+appId: com.lumina.app
+productName: Lumina
+directories:
+  output: dist-build
+  buildResources: build
+files:
+  - dist/**/*
+  - package.json
+extraResources:
+  # server 入口与依赖（asar 外，动态 require + spawn 需要）
+  - from: staging/server
+    to: server
+  # 前端静态产物（主进程 fallback file:// 加载）
+  - from: staging/web
+    to: web
+asarUnpack:
+  # 原生绑定：Zvec HNSW（.node）
+  - '**/node_modules/@zvec/**'
+  # DSH CLI（harness spawn 的 bin.js + 原生层）
+  - '**/node_modules/@deepseek-ai/**'
+  # pdf-parse 内嵌 pdfjs worker
+  - '**/node_modules/pdf-parse/**'
+  # officeparser OCR 可选传递依赖（已 disable 构建，保险解包）
+  - '**/node_modules/tesseract.js/**'
+mac:
+  category: public.app-category.productivity
+  target:
+    - target: dmg
+      arch: [arm64]
+  identity: null # 未签名，本地分发；后续公证再开
+dmg:
+  title: Lumina

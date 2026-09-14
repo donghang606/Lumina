@@ -1,10 +1,9 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import { homedir } from 'node:os'
+import { dataRoot } from './dataRoot.js'
 
-const DATA_DIR = path.join(homedir(), 'Library', 'Application Support', 'com.lumina.app')
-const KEY_FILE = path.join(DATA_DIR, 'lumina.key')
+const KEY_FILE = path.join(dataRoot(), 'lumina.key')
 
 const ALGO = 'aes-256-gcm'
 const PREFIX = 'enc:v1:'
@@ -18,7 +17,8 @@ function getOrCreateKey(): Buffer {
   } catch {
     /* fall through to regenerate */
   }
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
+  const keyDir = path.dirname(KEY_FILE)
+  if (!fs.existsSync(keyDir)) fs.mkdirSync(keyDir, { recursive: true })
   const key = crypto.randomBytes(32)
   fs.writeFileSync(KEY_FILE, key.toString('base64'), { mode: 0o600 })
   return key

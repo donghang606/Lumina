@@ -6,7 +6,7 @@
  *   --package   —— electron-builder 打 dmg
  */
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, cpSync } from 'node:fs'
 import net from 'node:net'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -73,10 +73,32 @@ async function packageApp() {
 
   const webDist = path.join(root, 'apps/desktop/dist')
   if (!existsSync(webDist)) throw new Error('web dist missing')
-  mkdirSync(path.join(root, 'apps/electron/staging/web'), { recursive: true })
-  spawnSync('cp', ['-R', webDist, path.join(root, 'apps/electron/staging/web/dist')], { stdio: 'inherit' })
-  spawnSync('cp', ['-R', path.join(root, 'apps/server/dist'), path.join(root, 'apps/electron/staging/server')], { stdio: 'inherit' })
-  spawnSync('cp', ['-R', path.join(root, 'apps/server/node_modules'), path.join(root, 'apps/electron/staging/server/node_modules')], { stdio: 'inherit' })
+
+  // server 自包含：pnpm deploy 产出实体 node_modules（无跨目录 symlink），再 tar 内嵌
+  // extraResources 过滤 node_modules 目录，故以单 tar 文件内嵌、首启解压到 userData
+  console.log('[package] pnpm deploy server (self-contained)...')
+  const serverDir = path.join(root, 'apps/server')
+  const deployDir = path.join('/tmp', 'lumina-server-deploy')
+  rmSync(deployDir, { recursive: true, force: true })
+  const deploy = spawnSync('pnpm', ['--filter', '@lumina/server', 'deploy', '--prod', '--legacy', deployDir], {
+    stdio: 'inherit',
+    cwd: root,
+    env: { ...process.env, CI: 'true' },
+    shell: process.platform === 'win32',
+  })
+  if (deploy.status !== 0) throw new Error(`pnpm deploy failed: ${deploy.status}`)
+  if (!existsSync(path.join(deployDir, 'dist/index.js'))) throw new Error('deploy missing dist/index.js')
+
+  const staging = path.join(root, 'apps/electron/staging')
+  rmSync(staging, { recursive: true, force: true })
+  mkdirSync(path.join(staging, 'web'), { recursive: true })
+  cpSync(webDist, path.join(staging, 'web/dist'), { recursive: true })
+
+  console.log('[package] bundling server tar...')
+  const tarFile = path.join(staging, 'server-bundle.tar')
+  const tarOut = spawnSync('tar', ['-cf', tarFile, '-C', deployDir, 'dist', 'node_modules', 'package.json'], { stdio: 'inherit' })
+  if (tarOut.status !== 0) throw new Error('tar create failed')
+  if (!existsSync(path.join(deployDir, 'node_modules/express'))) throw new Error('deploy missing express')
 
   console.log('[package] running electron-builder...')
   const electronBuilder = path.join(root, 'node_modules/.bin/electron-builder')

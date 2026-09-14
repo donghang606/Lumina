@@ -1,8 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import os from 'node:os'
 import { ChatOpenAI } from '@langchain/openai'
 import { getActiveProvider } from '../llm/provider.js'
+import { dataRoot } from '../lib/dataRoot.js'
 import type { Context } from '../trpc/context.js'
 
 export interface AgentModelConfig {
@@ -32,7 +32,7 @@ export function createLangChainModel(config: AgentModelConfig): ChatOpenAI {
 
 /** Agent 沙箱根目录：{userData}/agent（SKILL/memories/SANDBOX 都在其下）。 */
 export function getAgentRootDir(): string {
-  return path.join(os.homedir(), 'Library', 'Application Support', 'com.lumina.app', 'agent')
+  return path.join(dataRoot(), 'agent')
 }
 
 export interface MemoryFile {

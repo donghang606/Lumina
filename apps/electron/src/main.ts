@@ -44,17 +44,36 @@ async function waitForHealth(port: number, timeoutMs: number): Promise<void> {
   throw new Error(`Server health check timed out after ${timeoutMs}ms on port ${port}`)
 }
 
+/** 生产模式：从 resources/server-bundle.tar 首启解压 server 到 userData/server（版本指纹防重复） */
+function extractServerBundle(): string {
+  const resources = process.resourcesPath!
+  const tarPath = path.join(resources, 'server-bundle.tar')
+  const targetDir = path.join(app.getPath('userData'), 'server')
+  const marker = path.join(targetDir, '.bundle-version')
+  const appVersion = app.getVersion()
+
+  if (fs.existsSync(marker) && fs.readFileSync(marker, 'utf8').trim() === appVersion && fs.existsSync(path.join(targetDir, 'dist/index.js'))) {
+    return targetDir
+  }
+  if (!fs.existsSync(tarPath)) throw new Error(`server bundle not found: ${tarPath}`)
+
+  console.log(`[electron] extracting server bundle to ${targetDir}`)
+  fs.rmSync(targetDir, { recursive: true, force: true })
+  fs.mkdirSync(targetDir, { recursive: true })
+  const r = spawnSync('tar', ['-xf', tarPath, '-C', targetDir], { stdio: 'inherit' })
+  if (r.status !== 0) throw new Error(`server bundle extract failed: ${r.status}`)
+  fs.writeFileSync(marker, appVersion)
+  return targetDir
+}
+
 /** 在打包目录中定位 server 入口与前端产物 */
 function resolvePackagedPaths(): { serverEntry: string; webDir: string | null } {
   const resources = process.resourcesPath!
-  const candidates = [
-    { serverEntry: path.join(resources, 'server/dist/index.js'), webDir: path.join(resources, 'web/dist') },
-    { serverEntry: path.join(resources, 'app.asar.unpacked/server/dist/index.js'), webDir: null },
-  ]
-  for (const c of candidates) {
-    if (fs.existsSync(c.serverEntry)) return c
+  const serverDir = extractServerBundle()
+  return {
+    serverEntry: path.join(serverDir, 'dist/index.js'),
+    webDir: fs.existsSync(path.join(resources, 'web/dist')) ? path.join(resources, 'web/dist') : null,
   }
-  throw new Error(`server entry not found under ${resources}`)
 }
 
 /** 解析运行 server 的 Node 可执行文件：优先系统 node（避免 Electron 内置 Node 的 js2c loader 对第三方 CJS/ESM 混合包的兼容问题），回退 Electron 自身 */
@@ -79,7 +98,6 @@ function startServer(port: number): ChildProcess {
       LUMINA_PORT: String(port),
       LUMINA_DATA_DIR: app.getPath('userData'),
       NODE_ENV: 'production',
-      ...(process.execPath === node ? {} : {}),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,

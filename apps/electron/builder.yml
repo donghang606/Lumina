@@ -7,10 +7,10 @@ files:
   - dist/**/*
   - package.json
 extraResources:
-  # server 入口与依赖（asar 外，动态 require + spawn 需要）
-  - from: staging/server
-    to: server
-  # 前端静态产物（主进程 fallback file:// 加载）
+  # server 以 tar 形式内嵌（extraFiles 被 electron-builder 过滤 node_modules，改首启解压到 userData）
+  - from: staging/server-bundle.tar
+    to: server-bundle.tar
+  # 前端静态产物（server 静态托管）
   - from: staging/web
     to: web
 asarUnpack:

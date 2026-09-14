@@ -1,8 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import os from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { load as yamlLoad, dump as yamlDump } from 'js-yaml'
+import { dataRoot } from '../lib/dataRoot.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -11,7 +11,7 @@ export const HARNESS_CREDENTIAL = 'LUMINA_HARNESS_API_KEY'
 const START_TIMEOUT_MS = 45_000
 
 export function harnessRoot(): string {
-  return path.join(os.homedir(), 'Library', 'Application Support', 'com.lumina.app', 'deepseek-harness')
+  return path.join(dataRoot(), 'deepseek-harness')
 }
 
 export function harnessPaths() {

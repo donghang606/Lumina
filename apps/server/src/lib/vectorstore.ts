@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import os from 'node:os'
+import { dataRoot } from './dataRoot.js'
 import {
   ZVecInitialize,
   ZVecCreateAndOpen,
@@ -28,7 +28,7 @@ let initialized = false
 const collectionCache = new Map<string, ZVecCollection>()
 
 export function zvecRoot(): string {
-  return path.join(os.homedir(), 'Library', 'Application Support', 'com.lumina.app', 'zvec')
+  return path.join(dataRoot(), 'zvec')
 }
 
 function ensureInit(): void {

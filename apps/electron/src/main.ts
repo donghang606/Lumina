@@ -3,6 +3,7 @@ import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import net from 'node:net'
 import path from 'node:path'
 import fs from 'node:fs'
+import { migrateLegacyData } from './migrate.js'
 
 declare const __dirname: string
 const isDev = process.env.LUMINA_ELECTRON_DEV === '1'
@@ -147,6 +148,16 @@ function createWindow(frontendUrl: string) {
 }
 
 async function bootstrap() {
+  // 老库迁移（一次性）：Tauri com.lumina.app → userData/data
+  try {
+    const result = migrateLegacyData(app.getPath('userData'))
+    if (result && result.migrated.length > 0) {
+      console.log(`[electron] migrated legacy data: ${result.migrated.join(', ')}`)
+    }
+  } catch (err) {
+    console.warn('[electron] legacy data migration skipped:', err)
+  }
+
   serverPort = await findFreePort(3001)
   console.log(`[electron] starting server on port ${serverPort}`)
 

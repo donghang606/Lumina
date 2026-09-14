@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { eq, or, sql, desc, inArray } from 'drizzle-orm'
 import { embedTexts, cosineSimilarity, getActiveProvider } from '../llm/provider.js'
 import { bm25Score, fuseRanks, rankByScores, type SearchableDoc } from '../lib/hybridSearch.js'
+import { noteBm25Index } from '../lib/bm25Index.js'
 import { insertChunks, deleteNoteChunks, searchChunks } from '../lib/vectorstore.js'
 
 /**
@@ -78,6 +79,7 @@ export const noteRouter = router({
         createdAt: now,
         updatedAt: now,
       })
+      noteBm25Index.invalidate()
 
       if (input.tagIds?.length) {
         await ctx.db.insert(tagsOnNotes).values(input.tagIds.map((tagId) => ({ noteId: id, tagId, assignedBy: 'manual' as const })))
@@ -94,6 +96,7 @@ export const noteRouter = router({
     if (input.meta !== undefined) patch.meta = JSON.stringify(input.meta)
 
     await ctx.db.update(notes).set(patch as never).where(eq(notes.id, input.id)).run()
+    noteBm25Index.invalidate()
     const row = await ctx.db.select().from(notes).where(eq(notes.id, input.id)).get()
     return row ? { ...row, meta: row.meta ?? {} } : null
   }),
@@ -114,6 +117,7 @@ export const noteRouter = router({
       /* zvec 不可用 */
     }
     await ctx.db.delete(notes).where(eq(notes.id, input.id)).run()
+    noteBm25Index.invalidate()
     await ctx.db
       .insert(noteTombstones)
       .values({ noteId: input.id, deletedAt: now, deletedBy: 'local' })
@@ -453,11 +457,22 @@ export const noteRouter = router({
     .input(z.object({ query: z.string().min(1).max(500), limit: z.number().int().min(1).max(20).default(8) }))
     .query(async ({ ctx, input }) => {
       const p = await getActiveProvider(ctx)
-      const rows = await ctx.db.select().from(notes).all()
-      const docs = rows.map((n) => ({ id: n.id, title: n.title, content: n.content ?? '' }))
-
-      // BM25 关键词检索（纯本地，始终可用）
-      const bm25Hits = bm25Score(input.query, docs)
+      // BM25：内存倒排索引（异步构建 + 变更失效），万级笔记 O(命中候选)；未就绪回退纯函数全扫
+      await noteBm25Index
+        .bind(() =>
+          ctx.db
+            .select()
+            .from(notes)
+            .all()
+            .then((rows) => rows.map((n) => ({ id: n.id, title: n.title, content: n.content ?? '' }))),
+        )
+        .catch(() => {})
+      let bm25Hits = noteBm25Index.search(input.query)
+      if (bm25Hits === null) {
+        const rows = await ctx.db.select().from(notes).all()
+        const docs = rows.map((n) => ({ id: n.id, title: n.title, content: n.content ?? '' }))
+        bm25Hits = bm25Score(input.query, docs)
+      }
       const kwMatches = bm25Hits.slice(0, input.limit)
 
       if (!p.ready) {
@@ -466,7 +481,7 @@ export const noteRouter = router({
           items: kwMatches.map((m) => ({
             id: m.id,
             title: m.title,
-            snippet: stripNote(docs.find((d) => d.id === m.id)?.content ?? ''),
+            snippet: m.snippet,
             score: m.bm25,
           })),
         }
@@ -515,15 +530,12 @@ export const noteRouter = router({
       // RRF 融合 BM25 与语义排名
       const fused = fuseRanks(bm25Hits, semanticRank, semanticScores).slice(0, input.limit)
 
-      const snippetOf = (id: string, d: SearchableDoc | undefined, fallback: string) =>
-        d ? stripNote(d.content) : fallback
-
       return {
         source: 'hybrid' as const,
         items: fused.map((f) => ({
           id: f.id,
           title: f.title,
-          snippet: snippetOf(f.id, docs.find((d) => d.id === f.id), f.snippet),
+          snippet: f.snippet,
           score: Math.round(f.score * 1000) / 1000,
         })),
       }

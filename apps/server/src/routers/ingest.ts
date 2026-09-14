@@ -9,6 +9,7 @@ import { notes, fileIngests } from '../db/schema.js'
 import { getActiveProvider, embedTexts } from '../llm/provider.js'
 import { extractFileText, isSupportedFile, SUPPORTED_EXTS } from '../lib/fileLoaders.js'
 import { deleteNoteChunks } from '../lib/vectorstore.js'
+import { noteBm25Index } from '../lib/bm25Index.js'
 import { indexNoteChunks } from './note.js'
 
 type Db = typeof import('../db/client.js').db
@@ -54,6 +55,7 @@ async function doIngestFile(db: Db, absPath: string, skipDup: boolean): Promise<
 
   if (existing?.noteId) {
     await db.update(notes).set({ content: clean, title: fileName, updatedAt: now }).where(eq(notes.id, existing.noteId)).run()
+    noteBm25Index.invalidate()
   } else {
     await db.insert(notes).values({
       id: noteId,
@@ -65,6 +67,7 @@ async function doIngestFile(db: Db, absPath: string, skipDup: boolean): Promise<
       createdAt: now,
       updatedAt: now,
     })
+    noteBm25Index.invalidate()
   }
 
   const chunks = chunkText(clean)
@@ -160,7 +163,10 @@ export const ingestRouter = router({
         /* 该维度不可用 */
       }
     }
-    if (row.noteId) await ctx.db.delete(notes).where(eq(notes.id, row.noteId)).run()
+    if (row.noteId) {
+      await ctx.db.delete(notes).where(eq(notes.id, row.noteId)).run()
+      noteBm25Index.invalidate()
+    }
     await ctx.db.delete(fileIngests).where(eq(fileIngests.id, input.id)).run()
     return { ok: true }
   }),

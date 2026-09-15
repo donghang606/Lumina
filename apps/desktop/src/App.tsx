@@ -1,9 +1,8 @@
-import { Sparkles, CircleDot, Bot } from 'lucide-react'
+import { Sparkles, CircleDot } from 'lucide-react'
 
 import Sidebar from './components/layout/Sidebar'
 import HomeFeed from './components/HomeFeed'
-import AISidePanel from './components/ai/AISidePanel'
-import AgentPanel from './components/ai/AgentPanel'
+import UnifiedAIPanel from './components/ai/UnifiedAIPanel'
 import NotesPage from './components/notes/NotesPage'
 import GraphPage from './components/graph/GraphPage'
 import TimelinePage from './components/timeline/TimelinePage'
@@ -24,7 +23,7 @@ function CurrentPage() {
 }
 
 export default function App() {
-  const { aiPanelOpen, setAIPanelOpen, toggleAIPanel, agentPanelOpen, setAgentPanelOpen, toggleAgentPanel } = useLayoutStore()
+  const { aiPanelOpen, setAIPanelOpen, toggleAIPanel } = useLayoutStore()
   useTheme()
 
   return (
@@ -76,10 +75,7 @@ export default function App() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <UiButton variant={agentPanelOpen ? 'primary' : 'outline'} icon={Bot} onClick={toggleAgentPanel}>
-            Agent
-          </UiButton>
-          <UiButton variant={aiPanelOpen ? 'primary' : 'outline'} icon={Sparkles} onClick={toggleAIPanel}>
+          <UiButton variant={aiPanelOpen ? 'primary' : 'outline'} icon={Sparkles} onClick={() => toggleAIPanel()}>
             Lumina AI
           </UiButton>
         </div>
@@ -104,8 +100,7 @@ export default function App() {
         </main>
       </div>
 
-      <AISidePanel open={aiPanelOpen} onClose={() => setAIPanelOpen(false)} />
-      <AgentPanel open={agentPanelOpen} onClose={() => setAgentPanelOpen(false)} />
+      <UnifiedAIPanel open={aiPanelOpen} onClose={() => setAIPanelOpen(false)} />
     </div>
   )
 }

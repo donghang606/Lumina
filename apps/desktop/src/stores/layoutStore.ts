@@ -1,27 +1,33 @@
 import { create } from 'zustand'
 
 export type NavKey = 'feed' | 'notes' | 'graph' | 'timeline' | 'schedule' | 'settings'
+export type AIMode = 'chat' | 'agent'
 
 interface LayoutState {
   nav: NavKey
   aiPanelOpen: boolean
-  agentPanelOpen: boolean
+  aiMode: AIMode
   setNav: (nav: NavKey) => void
-  toggleAIPanel: () => void
-  setAIPanelOpen: (open: boolean) => void
+  toggleAIPanel: (mode?: AIMode) => void
+  setAIPanelOpen: (open: boolean, mode?: AIMode) => void
+  setAIMode: (mode: AIMode) => void
+  /** 兼容旧调用方：打开面板（默认问答模式） */
   openAIPanel: () => void
-  toggleAgentPanel: () => void
-  setAgentPanelOpen: (open: boolean) => void
 }
 
 export const useLayoutStore = create<LayoutState>((set) => ({
   nav: 'feed',
   aiPanelOpen: false,
-  agentPanelOpen: false,
+  aiMode: 'chat',
   setNav: (nav) => set({ nav }),
-  toggleAIPanel: () => set((s) => ({ aiPanelOpen: !s.aiPanelOpen, agentPanelOpen: false })),
-  setAIPanelOpen: (open) => set({ aiPanelOpen: open }),
-  openAIPanel: () => set({ aiPanelOpen: true }),
-  toggleAgentPanel: () => set((s) => ({ agentPanelOpen: !s.agentPanelOpen, aiPanelOpen: false })),
-  setAgentPanelOpen: (open) => set({ agentPanelOpen: open }),
+  toggleAIPanel: (mode) =>
+    set((s) => {
+      if (s.aiPanelOpen && (!mode || mode === s.aiMode)) {
+        return { aiPanelOpen: false }
+      }
+      return { aiPanelOpen: true, aiMode: mode ?? s.aiMode }
+    }),
+  setAIPanelOpen: (open, mode) => set((s) => ({ aiPanelOpen: open, aiMode: mode ?? s.aiMode })),
+  setAIMode: (mode) => set({ aiMode: mode }),
+  openAIPanel: () => set({ aiPanelOpen: true, aiMode: 'chat' }),
 }))

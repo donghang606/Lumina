@@ -79,7 +79,10 @@ export const noteRouter = router({
         createdAt: now,
         updatedAt: now,
       })
-      noteBm25Index.invalidate()
+      // BM25 增量：O(1) upsert 新文档
+      if (!noteBm25Index.upsert({ id, title: input.title, content: input.content })) {
+        noteBm25Index.invalidate()
+      }
 
       if (input.tagIds?.length) {
         await ctx.db.insert(tagsOnNotes).values(input.tagIds.map((tagId) => ({ noteId: id, tagId, assignedBy: 'manual' as const })))
@@ -96,8 +99,14 @@ export const noteRouter = router({
     if (input.meta !== undefined) patch.meta = JSON.stringify(input.meta)
 
     await ctx.db.update(notes).set(patch as never).where(eq(notes.id, input.id)).run()
-    noteBm25Index.invalidate()
-    const row = await ctx.db.select().from(notes).where(eq(notes.id, input.id)).get()
+    // BM25 增量：能取到最新文档则 O(1) upsert，否则全量失效
+    const updated = await ctx.db.select().from(notes).where(eq(notes.id, input.id)).get()
+    if (updated) {
+      if (!noteBm25Index.upsert({ id: updated.id, title: updated.title, content: updated.content ?? '' })) {
+        noteBm25Index.invalidate()
+      }
+    } else noteBm25Index.invalidate()
+    const row = updated
     return row ? { ...row, meta: row.meta ?? {} } : null
   }),
 
@@ -117,7 +126,8 @@ export const noteRouter = router({
       /* zvec 不可用 */
     }
     await ctx.db.delete(notes).where(eq(notes.id, input.id)).run()
-    noteBm25Index.invalidate()
+    // BM25 增量：O(1) 移除
+    if (!noteBm25Index.removeDoc(input.id)) noteBm25Index.invalidate()
     await ctx.db
       .insert(noteTombstones)
       .values({ noteId: input.id, deletedAt: now, deletedBy: 'local' })

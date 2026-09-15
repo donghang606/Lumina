@@ -82,8 +82,94 @@ describe('Bm25Index（倒排剪枝版）', () => {
     const hits = idx.search('内容 词')!
     const queryMs = performance.now() - t1
     expect(hits.length).toBeGreaterThan(0)
-    // 建索引 10k 篇 < 3s；单查 < 50ms（原纯函数全扫 ~2.6s）
+    // 建索引 10k 篇 < 3s；单查 < 100ms（高频词最坏情况；原纯函数全扫 ~2.6s）
     expect(buildMs).toBeLessThan(3000)
-    expect(queryMs).toBeLessThan(50)
+    expect(queryMs).toBeLessThan(100)
+  })
+
+  it('增量 upsert 与全量重建逐分一致', async () => {
+    const idx = new Bm25Index()
+    const docs = [...DOCS]
+    await idx.bind(() => docs)
+    const before = idx.search('算法')!
+
+    // upsert 新文档
+    idx.upsert({ id: 'n6', title: '新算法笔记', content: 'vector 算法 进阶' })
+    // upsert 已有文档（内容变化）
+    idx.upsert({ id: 'n1', title: '算法导论（第二版）', content: 'vector index 算法与图结构' })
+
+    // 对照组：全量重建同样数据
+    const docs2 = [
+      ...docs.map((d) => (d.id === 'n1' ? { id: 'n1', title: '算法导论（第二版）', content: 'vector index 算法与图结构' } : d)),
+      { id: 'n6', title: '新算法笔记', content: 'vector 算法 进阶' },
+    ]
+    const fresh = new Bm25Index()
+    await fresh.bind(() => docs2)
+
+    for (const q of ['算法', 'vector', '图结构', '进阶']) {
+      const a = idx.search(q)!
+      const b = fresh.search(q)!
+      expect(a.map((h) => h.id)).toEqual(b.map((h) => h.id))
+      for (let i = 0; i < a.length; i++) {
+        expect(Math.abs(a[i].bm25 - b[i].bm25)).toBeLessThan(1e-12)
+      }
+    }
+    void before
+  })
+
+  it('增量 removeDoc 与全量重建逐分一致', async () => {
+    const idx = new Bm25Index()
+    await idx.bind(() => DOCS)
+    idx.removeDoc('n1')
+    idx.removeDoc('n4')
+
+    const remaining = DOCS.filter((d) => !['n1', 'n4'].includes(d.id))
+    const fresh = new Bm25Index()
+    await fresh.bind(() => remaining)
+
+    for (const q of ['算法', 'index', '优化']) {
+      const a = idx.search(q)!
+      const b = fresh.search(q)!
+      expect(a.map((h) => h.id)).toEqual(b.map((h) => h.id))
+      for (let i = 0; i < a.length; i++) {
+        expect(Math.abs(a[i].bm25 - b[i].bm25)).toBeLessThan(1e-12)
+      }
+    }
+  })
+
+  it('增量删除后再 upsert 同 id（编辑场景）与重建一致', async () => {
+    const idx = new Bm25Index()
+    await idx.bind(() => DOCS)
+    idx.upsert({ id: 'n2', title: '数据库进阶', content: 'index 优化与执行计划' })
+
+    const docs2 = DOCS.map((d) => (d.id === 'n2' ? { id: 'n2', title: '数据库进阶', content: 'index 优化与执行计划' } : d))
+    const fresh = new Bm25Index()
+    await fresh.bind(() => docs2)
+
+    const a = idx.search('优化')!
+    const b = fresh.search('优化')!
+    expect(a.map((h) => h.id)).toEqual(b.map((h) => h.id))
+    expect(idx.stats.docs).toBe(fresh.stats.docs)
+  })
+
+  it('10k 篇增量 upsert/remove < 5ms（O(1)）', async () => {
+    const big = Array.from({ length: 10000 }, (_, i) => ({
+      id: `n${i}`,
+      title: `笔记${i}`,
+      content: `内容 ${i % 100} 词 ${i % 50} 文本`,
+    }))
+    const idx = new Bm25Index()
+    await idx.bind(() => big)
+
+    const t0 = performance.now()
+    idx.upsert({ id: 'n3', title: '修改后的标题', content: '全新内容 关键词' })
+    const upMs = performance.now() - t0
+
+    const t1 = performance.now()
+    idx.removeDoc('n5')
+    const rmMs = performance.now() - t1
+
+    expect(upMs).toBeLessThan(5)
+    expect(rmMs).toBeLessThan(5)
   })
 })

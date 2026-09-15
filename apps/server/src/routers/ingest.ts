@@ -55,7 +55,7 @@ async function doIngestFile(db: Db, absPath: string, skipDup: boolean): Promise<
 
   if (existing?.noteId) {
     await db.update(notes).set({ content: clean, title: fileName, updatedAt: now }).where(eq(notes.id, existing.noteId)).run()
-    noteBm25Index.invalidate()
+    if (!noteBm25Index.upsert({ id: existing.noteId, title: fileName, content: clean })) noteBm25Index.invalidate()
   } else {
     await db.insert(notes).values({
       id: noteId,
@@ -67,7 +67,7 @@ async function doIngestFile(db: Db, absPath: string, skipDup: boolean): Promise<
       createdAt: now,
       updatedAt: now,
     })
-    noteBm25Index.invalidate()
+    if (!noteBm25Index.upsert({ id: noteId, title: fileName, content: clean })) noteBm25Index.invalidate()
   }
 
   const chunks = chunkText(clean)
@@ -165,7 +165,7 @@ export const ingestRouter = router({
     }
     if (row.noteId) {
       await ctx.db.delete(notes).where(eq(notes.id, row.noteId)).run()
-      noteBm25Index.invalidate()
+      if (!noteBm25Index.removeDoc(row.noteId)) noteBm25Index.invalidate()
     }
     await ctx.db.delete(fileIngests).where(eq(fileIngests.id, input.id)).run()
     return { ok: true }

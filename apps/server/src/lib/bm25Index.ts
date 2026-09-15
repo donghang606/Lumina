@@ -57,7 +57,13 @@ export class Bm25Index {
     if (!this.rebuildPromise) {
       this.rebuildPromise = (async () => {
         const docs = this.source ? await this.source() : []
-        this.posting = Bm25Index.buildPosting(docs)
+        const p: PostingEntry = {
+          tf: new Map(), df: new Map(), docLen: new Map(), title: new Map(),
+          contentHead: new Map(), totalLen: 0, docCount: 0,
+        }
+        this.docTerms.clear()
+        for (const d of docs) this.insertIntoPosting(p, d)
+        this.posting = p
       })().catch((err) => {
         this.rebuildPromise = null
         throw err
@@ -66,52 +72,96 @@ export class Bm25Index {
     return this.rebuildPromise
   }
 
-  /** 同步构建（私有静态：docs → 倒排）。 */
-  private static buildPosting(docs: SearchableDoc[]): PostingEntry {
-    const tf = new Map<string, Map<string, number>>()
-    const df = new Map<string, number>()
-    const docLen = new Map<string, number>()
-    const title = new Map<string, string>()
-    const contentHead = new Map<string, string>()
-    let totalLen = 0
-
-    for (const d of docs) {
-      const titleTokens = tokenize(d.title)
-      const contentTokens = tokenize(d.content)
-      const weighted = [...titleTokens, ...titleTokens, ...contentTokens]
-      // 与纯函数对齐：文档长度用未加权 token 数（title 计 1 次）
-      docLen.set(d.id, titleTokens.length + contentTokens.length)
-      title.set(d.id, d.title || '(无标题)')
-      contentHead.set(d.id, (d.content ?? '').slice(0, 500))
-      // 与纯函数对齐：avgdl 用未加权长度
-      totalLen += titleTokens.length + contentTokens.length
-
-      const seen = new Set<string>()
-      const localTf = new Map<string, number>()
-      for (const w of weighted) {
-        localTf.set(w, (localTf.get(w) ?? 0) + 1)
-        if (!seen.has(w)) {
-          seen.add(w)
-          df.set(w, (df.get(w) ?? 0) + 1)
-        }
-      }
-      for (const [w, f] of localTf) {
-        let byDoc = tf.get(w)
-        if (!byDoc) {
-          byDoc = new Map()
-          tf.set(w, byDoc)
-        }
-        byDoc.set(d.id, f)
-      }
-    }
-
-    return { tf, df, docLen, title, contentHead, totalLen, docCount: docs.length }
-  }
-
   /** 后台预热（不阻塞请求）。 */
   warmup(): void {
     void this.ensureBuilt().catch(() => {})
   }
+
+  /**
+   * O(1) 增量更新单文档（未构建完成时 no-op 返回 false，调用方可先 invalidate）。
+   * 语义：先逆向剥离旧文档贡献（如有），再插入新文档。与全量重建后状态一致。
+   */
+  upsert(doc: SearchableDoc): boolean {
+    const p = this.posting
+    if (!p) return false
+    this.removeFromPosting(p, doc.id)
+    this.insertIntoPosting(p, doc)
+    this.version++
+    return true
+  }
+
+  /** O(1) 增量删除单文档。未构建完成时 no-op 返回 false。 */
+  removeDoc(docId: string): boolean {
+    const p = this.posting
+    if (!p) return false
+    this.removeFromPosting(p, docId)
+    this.version++
+    return true
+  }
+
+  /** 内部：文档插入倒排（与 buildPosting 单文档逻辑一致）。 */
+  private insertIntoPosting(p: PostingEntry, d: SearchableDoc): void {
+    const titleTokens = tokenize(d.title)
+    const contentTokens = tokenize(d.content)
+    const weighted = [...titleTokens, ...titleTokens, ...contentTokens]
+    const len = titleTokens.length + contentTokens.length
+    p.docLen.set(d.id, len)
+    p.title.set(d.id, d.title || '(无标题)')
+    p.contentHead.set(d.id, (d.content ?? '').slice(0, 500))
+    p.totalLen += len
+    p.docCount += 1
+
+    const seen = new Set<string>()
+    const localTf = new Map<string, number>()
+    for (const w of weighted) {
+      localTf.set(w, (localTf.get(w) ?? 0) + 1)
+      if (!seen.has(w)) {
+        seen.add(w)
+        p.df.set(w, (p.df.get(w) ?? 0) + 1)
+      }
+    }
+    for (const [w, f] of localTf) {
+      let byDoc = p.tf.get(w)
+      if (!byDoc) {
+        byDoc = new Map()
+        p.tf.set(w, byDoc)
+      }
+      byDoc.set(d.id, f)
+    }
+    // 记录 unique terms（增量删除逆向剥离依据）
+    this.docTerms.set(d.id, new Set(localTf.keys()))
+  }
+
+  /** 内部：文档从倒排逆向剥离（依赖 df 的 unique-term 记录，需同时回退 tf 与统计量）。 */
+  private removeFromPosting(p: PostingEntry, docId: string): void {
+    const len = p.docLen.get(docId)
+    if (len === undefined) return // 不存在（新文档）
+    p.totalLen -= len
+    p.docCount -= 1
+    p.docLen.delete(docId)
+    p.title.delete(docId)
+    p.contentHead.delete(docId)
+
+    // 遍历该文档的 unique terms：只能从 tf 入手（df 无 doc 归属记录）
+    // 剥离策略：扫描 tf 中含 docId 的条目。为避免全库扫描 tf，维护 docTerms 反查表
+    const terms = this.docTerms.get(docId)
+    if (terms) {
+      for (const w of terms) {
+        const byDoc = p.tf.get(w)
+        if (byDoc) {
+          byDoc.delete(docId)
+          if (byDoc.size === 0) p.tf.delete(w)
+        }
+        const n = (p.df.get(w) ?? 1) - 1
+        if (n <= 0) p.df.delete(w)
+        else p.df.set(w, n)
+      }
+      this.docTerms.delete(docId)
+    }
+  }
+
+  /** docId -> unique terms（增量删除的逆向剥离依据）。 */
+  private docTerms = new Map<string, Set<string>>()
 
   /** 索引是否就绪（未就绪时调用方回退纯函数 bm25Score）。 */
   get ready(): boolean {

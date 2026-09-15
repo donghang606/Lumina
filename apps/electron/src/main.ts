@@ -158,6 +158,14 @@ async function bootstrap() {
     console.warn('[electron] legacy data migration skipped:', err)
   }
 
+  // 生产模式：先解包 server、定位 web dist，再 spawn（env 需在 spawn 前就绪）
+  let packagedWebDir: string | null = null
+  if (!isDev) {
+    const paths = resolvePackagedPaths()
+    packagedWebDir = paths.webDir
+    if (packagedWebDir) process.env.LUMINA_WEB_DIST = packagedWebDir
+  }
+
   serverPort = await findFreePort(3001)
   console.log(`[electron] starting server on port ${serverPort}`)
 
@@ -168,14 +176,7 @@ async function bootstrap() {
   if (isDev) {
     createWindow(DEV_FRONTEND_URL)
   } else {
-    // 生产：server 进程内托管静态前端（staging/web/dist 复制到 resources/web）
-    const { webDir } = resolvePackagedPaths()
-    if (webDir && fs.existsSync(webDir)) {
-      process.env.LUMINA_WEB_DIST = webDir
-      createWindow(`http://127.0.0.1:${serverPort}/`)
-    } else {
-      createWindow(`http://127.0.0.1:${serverPort}/`)
-    }
+    createWindow(`http://127.0.0.1:${serverPort}/`)
   }
 }
 

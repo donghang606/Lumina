@@ -21,7 +21,7 @@ function chunkText(text: string, size = 700): string[] {
   return chunks
 }
 
-interface IngestOutcome {
+export interface IngestOutcome {
   ok: boolean
   skipped?: boolean
   noteId?: string | null
@@ -31,7 +31,7 @@ interface IngestOutcome {
 }
 
 /** 单文件导入核心（router 与目录扫描共用）。 */
-async function doIngestFile(db: Db, absPath: string, skipDup: boolean): Promise<IngestOutcome> {
+export async function doIngestFile(db: Db, absPath: string, skipDup: boolean): Promise<IngestOutcome> {
   if (!fs.existsSync(absPath) || !fs.statSync(absPath).isFile()) return { ok: false, reason: '文件不存在' }
   if (!isSupportedFile(absPath)) return { ok: false, reason: `不支持的类型（支持：${SUPPORTED_EXTS.join('/')}）` }
 

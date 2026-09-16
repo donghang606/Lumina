@@ -6,6 +6,8 @@ import { eq, or, sql, desc, inArray } from 'drizzle-orm'
 import { embedTexts, cosineSimilarity, getActiveProvider } from '../llm/provider.js'
 import { bm25Score, fuseRanks, rankByScores, type SearchableDoc } from '../lib/hybridSearch.js'
 import { noteBm25Index } from '../lib/bm25Index.js'
+import { dataRoot } from '../lib/dataRoot.js'
+import path from 'node:path'
 import { insertChunks, deleteNoteChunks, searchChunks } from '../lib/vectorstore.js'
 
 /**
@@ -467,14 +469,25 @@ export const noteRouter = router({
     .input(z.object({ query: z.string().min(1).max(500), limit: z.number().int().min(1).max(20).default(8) }))
     .query(async ({ ctx, input }) => {
       const p = await getActiveProvider(ctx)
-      // BM25：内存倒排索引（异步构建 + 变更失效），万级笔记 O(命中候选)；未就绪回退纯函数全扫
+      // BM25：内存倒排索引（快照优先 + 增量维护），万级笔记查询 O(命中候选)；未就绪回退纯函数全扫
       await noteBm25Index
-        .bind(() =>
-          ctx.db
-            .select()
-            .from(notes)
-            .all()
-            .then((rows) => rows.map((n) => ({ id: n.id, title: n.title, content: n.content ?? '' }))),
+        .bind(
+          () =>
+            ctx.db
+              .select()
+              .from(notes)
+              .all()
+              .then((rows) => rows.map((n) => ({ id: n.id, title: n.title, content: n.content ?? '' }))),
+          {
+            snapshotPath: path.join(dataRoot(), 'bm25-snapshot.json'),
+            signature: async () => {
+              const row = await ctx.db
+                .select({ c: sql<number>`count(*)`, m: sql<string>`max(${notes.updatedAt})` })
+                .from(notes)
+                .get()
+              return `${row?.c ?? 0}:${row?.m ?? ''}`
+            },
+          },
         )
         .catch(() => {})
       let bm25Hits = noteBm25Index.search(input.query)

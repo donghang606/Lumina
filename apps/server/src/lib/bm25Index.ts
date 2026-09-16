@@ -9,6 +9,8 @@
  */
 import { tokenize } from './hybridSearch.js'
 import type { Bm25Hit, SearchableDoc } from './hybridSearch.js'
+import fs from 'node:fs'
+import path from 'node:path'
 
 interface PostingEntry {
   /** term -> docId -> 加权词频（标题词 ×2） */
@@ -25,6 +27,13 @@ interface PostingEntry {
   docCount: number
 }
 
+interface BindOptions {
+  /** 磁盘快照路径（命中则冷启跳过全量构建） */
+  snapshotPath?: string
+  /** 内容指纹（如笔记数 + 最大 updatedAt）；与快照头比对，不匹配则重建 */
+  signature?: () => string | Promise<string>
+}
+
 const K1 = 1.5
 const B = 0.75
 
@@ -32,11 +41,18 @@ export class Bm25Index {
   private posting: PostingEntry | null = null
   private version = 0
   private source: (() => SearchableDoc[] | Promise<SearchableDoc[]>) | null = null
+  private opts: BindOptions = {}
   private rebuildPromise: Promise<void> | null = null
+  private saveTimer: ReturnType<typeof setTimeout> | null = null
+  private currentSignature = ''
 
-  /** 注册数据源并异步重建（fire-and-forget 安全）。返回重建 promise。 */
-  bind(docs: SearchableDoc[] | (() => SearchableDoc[] | Promise<SearchableDoc[]>)): Promise<void> {
+  /** 注册数据源并异步构建（优先快照 load）。 */
+  bind(
+    docs: SearchableDoc[] | (() => SearchableDoc[] | Promise<SearchableDoc[]>),
+    options?: BindOptions,
+  ): Promise<void> {
     this.source = typeof docs === 'function' ? docs : () => docs
+    this.opts = options ?? {}
     this.invalidate()
     return this.ensureBuilt()
   }
@@ -51,11 +67,23 @@ export class Bm25Index {
     return this.version
   }
 
-  /** 确保索引已构建（单飞：并发调用共享一次构建）。 */
+  /** 确保索引就绪：快照命中则 load（冷启 ~50-200ms），否则全量 build 后 save。 */
   ensureBuilt(): Promise<void> {
     if (this.posting) return Promise.resolve()
     if (!this.rebuildPromise) {
       this.rebuildPromise = (async () => {
+        const sig = this.opts.signature ? String(await this.opts.signature()) : ''
+        this.currentSignature = sig
+        // 尝试快照 load
+        if (this.opts.snapshotPath && sig) {
+          const loaded = Bm25Index.loadSnapshot(this.opts.snapshotPath, sig)
+          if (loaded) {
+            this.posting = loaded.posting
+            this.docTerms = loaded.docTerms
+            return
+          }
+        }
+        // 全量构建
         const docs = this.source ? await this.source() : []
         const p: PostingEntry = {
           tf: new Map(), df: new Map(), docLen: new Map(), title: new Map(),
@@ -64,12 +92,97 @@ export class Bm25Index {
         this.docTerms.clear()
         for (const d of docs) this.insertIntoPosting(p, d)
         this.posting = p
+        // 异步持久化（不阻塞）
+        if (this.opts.snapshotPath) this.scheduleSave()
       })().catch((err) => {
         this.rebuildPromise = null
         throw err
       }) as Promise<void>
     }
     return this.rebuildPromise
+  }
+
+  /** 序列化到磁盘（防抖 1s，合并连续 mutation）。 */
+  private scheduleSave(): void {
+    if (this.saveTimer) clearTimeout(this.saveTimer)
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null
+      void this.saveNow().catch(() => {})
+    }, 1000)
+  }
+
+  private async saveNow(): Promise<void> {
+    if (!this.posting || !this.opts.snapshotPath) return
+    const dir = path.dirname(this.opts.snapshotPath)
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+    // 增量后重算签名（mutation 改了 updatedAt/count），保证下次冷启命中
+    if (this.opts.signature) {
+      try { this.currentSignature = String(await this.opts.signature()) } catch { /* keep old sig */ }
+    }
+    const data = Bm25Index.serializePosting(this.posting, this.currentSignature)
+    fs.writeFileSync(this.opts.snapshotPath, JSON.stringify(data))
+  }
+
+  /** 反序列化快照（签名不匹配返回 null）。 */
+  private static loadSnapshot(snapshotPath: string, expectedSig: string): { posting: PostingEntry; docTerms: Map<string, Set<string>> } | null {
+    try {
+      if (!fs.existsSync(snapshotPath)) return null
+      const raw = JSON.parse(fs.readFileSync(snapshotPath, 'utf8'))
+      if (!raw || raw.signature !== expectedSig) return null
+      return Bm25Index.deserializePosting(raw)
+    } catch {
+      return null
+    }
+  }
+
+  private static serializePosting(p: PostingEntry, signature: string) {
+    // tf: Map<string,Map<string,number>> → { term: { docId: freq } }
+    const tfObj: Record<string, Record<string, number>> = {}
+    for (const [term, byDoc] of p.tf) {
+      const o: Record<string, number> = {}
+      for (const [docId, f] of byDoc) o[docId] = f
+      tfObj[term] = o
+    }
+    return {
+      signature,
+      tf: tfObj,
+      df: Object.fromEntries(p.df),
+      docLen: Object.fromEntries(p.docLen),
+      title: Object.fromEntries(p.title),
+      contentHead: Object.fromEntries(p.contentHead),
+      totalLen: p.totalLen,
+      docCount: p.docCount,
+    }
+  }
+
+  private static deserializePosting(raw: any): { posting: PostingEntry; docTerms: Map<string, Set<string>> } {
+    const tf = new Map<string, Map<string, number>>()
+    const docTerms = new Map<string, Set<string>>()
+    for (const term in raw.tf) {
+      const byDoc = new Map<string, number>()
+      for (const docId in raw.tf[term]) byDoc.set(docId, raw.tf[term][docId])
+      tf.set(term, byDoc)
+    }
+    // 重建 docTerms（unique terms per doc）—— 遍历 tf 反查
+    for (const [term, byDoc] of tf) {
+      for (const docId of byDoc.keys()) {
+        let s = docTerms.get(docId)
+        if (!s) { s = new Set(); docTerms.set(docId, s) }
+        s.add(term)
+      }
+    }
+    return {
+      posting: {
+        tf,
+        df: new Map(Object.entries(raw.df)),
+        docLen: new Map(Object.entries(raw.docLen)),
+        title: new Map(Object.entries(raw.title)),
+        contentHead: new Map(Object.entries(raw.contentHead)),
+        totalLen: raw.totalLen,
+        docCount: raw.docCount,
+      },
+      docTerms,
+    }
   }
 
   /** 后台预热（不阻塞请求）。 */
@@ -87,6 +200,7 @@ export class Bm25Index {
     this.removeFromPosting(p, doc.id)
     this.insertIntoPosting(p, doc)
     this.version++
+    if (this.opts.snapshotPath) this.scheduleSave()
     return true
   }
 
@@ -96,6 +210,7 @@ export class Bm25Index {
     if (!p) return false
     this.removeFromPosting(p, docId)
     this.version++
+    if (this.opts.snapshotPath) this.scheduleSave()
     return true
   }
 

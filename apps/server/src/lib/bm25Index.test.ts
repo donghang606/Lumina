@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { Bm25Index } from './bm25Index.js'
 import { bm25Score } from './hybridSearch.js'
 
@@ -171,5 +174,96 @@ describe('Bm25Index（倒排剪枝版）', () => {
 
     expect(upMs).toBeLessThan(5)
     expect(rmMs).toBeLessThan(5)
+  })
+})
+describe('Bm25Index 持久化', () => {
+  const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'bm25-snap-'))
+
+  it('save → load 往返：查询逐分一致', async () => {
+    const dir = tmpDir()
+    const snap = path.join(dir, 'snap.json')
+    let sig = '5:v1'
+    const idx = new Bm25Index()
+    await idx.bind(() => DOCS, { snapshotPath: snap, signature: () => sig })
+    // 防抖 save 等待
+    await new Promise((r) => setTimeout(r, 1200))
+    expect(fs.existsSync(snap)).toBe(true)
+
+    // 新实例 load
+    const idx2 = new Bm25Index()
+    await idx2.bind(() => DOCS, { snapshotPath: snap, signature: () => sig })
+    for (const q of ['算法', 'vector', '优化']) {
+      const a = idx.search(q)!
+      const b = idx2.search(q)!
+      expect(b).not.toBeNull()
+      expect(a.map((h) => h.id)).toEqual(b.map((h) => h.id))
+      for (let i = 0; i < a.length; i++) expect(Math.abs(a[i].bm25 - b[i].bm25)).toBeLessThan(1e-9)
+    }
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('签名不匹配 → 跳过快照、全量重建', async () => {
+    const dir = tmpDir()
+    const snap = path.join(dir, 'snap.json')
+    const idx = new Bm25Index()
+    await idx.bind(() => DOCS, { snapshotPath: snap, signature: () => '5:v1' })
+    await new Promise((r) => setTimeout(r, 1200))
+    expect(fs.existsSync(snap)).toBe(true)
+
+    // 新签名
+    const idx2 = new Bm25Index()
+    let sourceCalls = 0
+    await idx2.bind(
+      () => { sourceCalls++; return DOCS },
+      { snapshotPath: snap, signature: () => '5:v2' },
+    )
+    expect(sourceCalls).toBe(1) // 签名不匹配 → 调 source 全量 build
+    // 查询仍正确
+    expect(idx2.search('vector')!.length).toBeGreaterThan(0)
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('签名匹配 → load 跳过 source 调用（冷启零扫描）', async () => {
+    const dir = tmpDir()
+    const snap = path.join(dir, 'snap.json')
+    const idx = new Bm25Index()
+    let sig = '5:v1'
+    await idx.bind(() => DOCS, { snapshotPath: snap, signature: () => sig })
+    await new Promise((r) => setTimeout(r, 1200))
+
+    const idx2 = new Bm25Index()
+    let sourceCalls = 0
+    await idx2.bind(
+      () => { sourceCalls++; return DOCS },
+      { snapshotPath: snap, signature: () => sig },
+    )
+    expect(sourceCalls).toBe(0) // 命中快照 → 不调 source
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('增量后防抖 save 更新快照签名（下次冷启命中）', async () => {
+    const dir = tmpDir()
+    const snap = path.join(dir, 'snap.json')
+    let sig = '5:v1'
+    const idx = new Bm25Index()
+    await idx.bind(() => DOCS, { snapshotPath: snap, signature: () => sig })
+    await new Promise((r) => setTimeout(r, 1200))
+
+    // 模拟 mutation：签名变化 + upsert
+    sig = '6:v2'
+    idx.upsert({ id: 'n6', title: '新增', content: 'vector 新内容' })
+    await new Promise((r) => setTimeout(r, 1200)) // 防抖 save
+
+    const raw = JSON.parse(fs.readFileSync(snap, 'utf8'))
+    expect(raw.signature).toBe('6:v2') // saveNow 重算了签名
+    expect(raw.docCount).toBe(6)
+
+    // 新实例用新签名 → 命中快照（不调 source）
+    const idx2 = new Bm25Index()
+    let calls = 0
+    await idx2.bind(() => { calls++; return DOCS }, { snapshotPath: snap, signature: () => sig })
+    expect(calls).toBe(0)
+    expect(idx2.search('vector')!.map((h) => h.id)).toContain('n6')
+    fs.rmSync(dir, { recursive: true, force: true })
   })
 })

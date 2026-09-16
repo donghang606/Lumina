@@ -8,8 +8,10 @@ import { noteService, tagService } from '../../services/noteService'
 import { transcribeAudio } from '../../services/voiceService'
 import type { GraphData, TagWithCount } from '@lumina/shared'
 
+export interface LoadSignal { id: string; nonce: number }
+
 /** AI 问答视图：RAG 知识检索 + 图谱卡片 + 语音 + 标签提及（融合面板内嵌） */
-export default function AIChatView() {
+export default function AIChatView({ loadSignal }: { loadSignal?: LoadSignal | null }) {
   const inputRef = useRef<any>(null)
   const [messages, setMessages] = useState<ConversationMessage[]>([])
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
@@ -52,6 +54,11 @@ export default function AIChatView() {
     setActiveId(id)
     setMessages(detail.messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content, createdAt: m.createdAt })))
   }
+
+  // 外部（UnifiedAIPanel 聚合历史 chip）触发的加载请求
+  useEffect(() => {
+    if (loadSignal && loadSignal.id) void loadConversation(loadSignal.id)
+  }, [loadSignal?.nonce])
 
   const startNew = () => {
     setActiveId(null)

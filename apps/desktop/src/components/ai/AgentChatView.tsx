@@ -12,8 +12,10 @@ interface ChatMessage {
   createdAt?: string
 }
 
+export interface LoadSignal { id: string; nonce: number }
+
 /** Agent 视图：deepagents 工具调用流 + HITL 审批（融合面板内嵌） */
-export default function AgentChatView() {
+export default function AgentChatView({ loadSignal }: { loadSignal?: LoadSignal | null }) {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -49,6 +51,11 @@ export default function AgentChatView() {
     setActiveId(id); setApproval(null)
     setMessages(detail.messages.filter((m) => m.role === 'user' || m.role === 'assistant').map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content, createdAt: m.createdAt })))
   }
+
+  // 外部（UnifiedAIPanel 聚合历史 chip）触发的加载请求
+  useEffect(() => {
+    if (loadSignal && loadSignal.id) void loadConversation(loadSignal.id)
+  }, [loadSignal?.nonce])
 
   const removeConversation = async (id: string) => {
     await agentService.deleteConversation(id)

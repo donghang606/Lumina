@@ -34,7 +34,7 @@ describe('UnifiedAIPanel', () => {
 
   it('Agent 模式打开时显示空态与历史会话', async () => {
     render(<UnifiedAIPanel open onClose={() => {}} />)
-    await waitFor(() => expect(screen.getByText('旧会话')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getAllByText('旧会话').length).toBeGreaterThan(0))
     expect(screen.getByText('Lumina AI')).toBeInTheDocument()
     expect(screen.getByText(/我是 Lumina Agent/)).toBeInTheDocument()
   })
@@ -93,5 +93,17 @@ describe('UnifiedAIPanel', () => {
     expect(screen.getByText('知识卡片图谱')).toBeInTheDocument()
     fireEvent.click(screen.getByText('Agent'))
     expect(screen.getByText(/我是 Lumina Agent/)).toBeInTheDocument()
+  })
+
+  it('聚合最近会话 chip 点击 → 切 Agent tab + 加载会话', async () => {
+    useLayoutStore.setState({ aiPanelOpen: true, aiMode: 'chat' })
+    render(<UnifiedAIPanel open onClose={() => {}} />)
+    // 等聚合 chip 渲染（agentService.listConversations 返回 '旧会话'）
+    const chip = await waitFor(() => screen.getAllByText('旧会话')[0])
+    fireEvent.click(chip)
+    // 切到 Agent tab 后输入框 placeholder 是 Agent 的
+    await waitFor(() => expect(screen.getByPlaceholderText(/让 Agent 帮你查笔记/)).toBeInTheDocument())
+    // AgentChatView 收到 loadSignal → 调用 getConversation（已 mock 返回 messages）
+    expect(agentService.getConversation).toHaveBeenCalledWith('c1')
   })
 })

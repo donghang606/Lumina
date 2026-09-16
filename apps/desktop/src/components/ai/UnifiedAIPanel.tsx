@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { X, Sparkles, Bot } from 'lucide-react'
-import { useLayoutStore } from '../../stores/layoutStore'
-import AIChatView from './AIChatView'
+import { X, Sparkles, Bot, MessageSquare } from 'lucide-react'
+import { useLayoutStore, type AIMode } from '../../stores/layoutStore'
+import { aiService } from '../../services/aiService'
+import { agentService } from '../../services/agentService'
+import AIChatView, { type LoadSignal } from './AIChatView'
 import AgentChatView from './AgentChatView'
 
 interface Props {
@@ -9,19 +11,48 @@ interface Props {
   onClose: () => void
 }
 
-/** 融合面板：问答 / Agent 双模式，共享侧滑壳、会话历史样式、消息流样式 */
+interface RecentConv { id: string; title: string; mode: AIMode; updatedAt: string }
+
+/** 融合面板：问答 / Agent 双模式，共享侧滑壳、消息流样式；顶部聚合最近会话 */
 export default function UnifiedAIPanel({ open, onClose }: Props) {
   const { aiMode, setAIMode } = useLayoutStore()
   const [tab, setTab] = useState<'chat' | 'agent'>(aiMode)
+  const [recent, setRecent] = useState<RecentConv[]>([])
+  const [loadSignal, setLoadSignal] = useState<LoadSignal | null>(null)
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
-  useEffect(() => {
-    setTab(aiMode)
-  }, [aiMode])
+  const refreshRecent = async () => {
+    try {
+      const [ai, ag] = await Promise.all([
+        aiService.listConversations().catch(() => []),
+        agentService.listConversations().catch(() => []),
+      ])
+      const merged: RecentConv[] = [
+        ...ai.map((c) => ({ id: c.id, title: c.title, mode: 'chat' as AIMode, updatedAt: c.updatedAt })),
+        ...ag.map((c) => ({ id: c.id, title: c.title, mode: 'agent' as AIMode, updatedAt: c.updatedAt })),
+      ].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)).slice(0, 8)
+      setRecent(merged)
+    } catch { /* ignore */ }
+  }
+
+  useEffect(() => { setTab(aiMode) }, [aiMode])
 
   useEffect(() => {
-    if (open) setTimeout(() => tabRefs.current[tab]?.focus(), 80)
+    if (open) {
+      void refreshRecent()
+      setTimeout(() => tabRefs.current[tab]?.focus(), 80)
+    }
   }, [open, tab])
+
+  // 发送/审批后聚合刷新（view 内部状态变更时通过 reload 信号触发）
+  useEffect(() => {
+    if (loadSignal) void refreshRecent()
+  }, [loadSignal?.nonce])
+
+  const openRecent = (c: RecentConv) => {
+    setTab(c.mode); setAIMode(c.mode)
+    setLoadSignal({ id: c.id, nonce: Date.now() })
+  }
 
   if (!open) return null
 
@@ -90,9 +121,37 @@ export default function UnifiedAIPanel({ open, onClose }: Props) {
           })}
         </div>
 
-        {/* 视图区（key 触发重挂载，两模式状态独立） */}
-        <div key={tab} style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          {tab === 'chat' ? <AIChatView /> : <AgentChatView />}
+        {/* 最近会话（聚合问答 + Agent，按更新时间倒序，点击切 tab 并加载） */}
+        {recent.length > 0 && (
+          <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--glass-border)', display: 'flex', gap: 6, overflowX: 'auto' }}>
+            {recent.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => openRecent(c)}
+                title={c.title}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0,
+                  padding: '4px 8px', borderRadius: 'var(--radius-sm)',
+                  fontSize: 'var(--text-xs)', color: 'var(--text-2)',
+                  background: c.mode === tab ? 'var(--accent-soft)' : 'transparent',
+                  border: '1px solid var(--glass-border)', cursor: 'pointer', outline: 'none',
+                }}
+              >
+                {c.mode === 'agent' ? <Bot size={10} /> : <MessageSquare size={10} />}
+                <span style={{ maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title || '(无标题)'}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* 视图区：两 view 常驻，display 切换（保留各自会话/输入状态，切回不丢） */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, position: 'relative' }}>
+          <div style={{ position: 'absolute', inset: 0, display: tab === 'chat' ? 'flex' : 'none', flexDirection: 'column', minHeight: 0 }}>
+            <AIChatView loadSignal={tab === 'chat' ? loadSignal : null} />
+          </div>
+          <div style={{ position: 'absolute', inset: 0, display: tab === 'agent' ? 'flex' : 'none', flexDirection: 'column', minHeight: 0 }}>
+            <AgentChatView loadSignal={tab === 'agent' ? loadSignal : null} />
+          </div>
         </div>
       </div>
     </div>

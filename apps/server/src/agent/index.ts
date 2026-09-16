@@ -61,6 +61,7 @@ export async function createLuminaAgent(ctx: Context, options: { unattended?: bo
       '- 读取笔记详情/反链/出链（get_note）\n' +
       '- 建议创建笔记（suggest_note：进审核队列，用户确认后落库，安全）\n' +
       '- 直接创建笔记（create_note：需审批，仅在用户明确要求时用）\n' +
+      '- 编辑笔记（edit_note 改标题/正文覆盖；append_note 追加内容；均需审批）\n' +
       '- 标签管理（list_tags / set_tags，写操作需审批）\n' +
       '- 知识图谱（get_graph）与查询视图（run_query_view）\n' +
       '- 笔记库统计（get_note_stats / list_recent）\n' +

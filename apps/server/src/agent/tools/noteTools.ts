@@ -3,6 +3,7 @@ import { eq, desc } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { notes, noteLinks, tags, tagsOnNotes, aiSuggestions, views } from '../../db/schema.js'
 import { bm25Score } from '../../lib/hybridSearch.js'
+import { noteBm25Index } from '../../lib/bm25Index.js'
 import { registerTool } from '../registry.js'
 
 function strip(s: string): string {
@@ -138,6 +139,52 @@ registerTool({
       updatedAt: now,
     })
     return JSON.stringify({ id, createdAt: now })
+  },
+})
+
+registerTool({
+  name: 'edit_note',
+  description: '编辑已有笔记的标题和/或正文（覆盖更新，需审批）。适合"修改/完善/重写这篇笔记"。',
+  schema: z.object({
+    id: z.string().describe('笔记 id'),
+    title: z.string().optional().describe('新标题（不填则不改）'),
+    content: z.string().optional().describe('新正文（不填则不改；覆盖原文）'),
+  }),
+  meta: { requireApproval: true },
+  handler: async (args, ctx) => {
+    const id = String(args.id)
+    const existing = await ctx.db.select().from(notes).where(eq(notes.id, id)).get()
+    if (!existing) return JSON.stringify({ error: '笔记不存在' })
+    const patch: Record<string, unknown> = { updatedAt: new Date().toISOString() }
+    if (args.title !== undefined) patch.title = String(args.title)
+    if (args.content !== undefined) patch.content = String(args.content)
+    await ctx.db.update(notes).set(patch).where(eq(notes.id, id)).run()
+    // BM25 增量
+    const updated = await ctx.db.select().from(notes).where(eq(notes.id, id)).get()
+    if (updated) {
+      if (!noteBm25Index.upsert({ id: updated.id, title: updated.title, content: updated.content ?? '' })) noteBm25Index.invalidate()
+    }
+    return JSON.stringify({ ok: true, id, updatedAt: patch.updatedAt })
+  },
+})
+
+registerTool({
+  name: 'append_note',
+  description: '向已有笔记追加内容（不覆盖原文，需审批）。适合"给这篇笔记补充一段"。',
+  schema: z.object({
+    id: z.string().describe('笔记 id'),
+    content: z.string().describe('要追加的正文（Markdown）'),
+  }),
+  meta: { requireApproval: true },
+  handler: async (args, ctx) => {
+    const id = String(args.id)
+    const existing = await ctx.db.select().from(notes).where(eq(notes.id, id)).get()
+    if (!existing) return JSON.stringify({ error: '笔记不存在' })
+    const now = new Date().toISOString()
+    const merged = `${existing.content ?? ''}\n\n${String(args.content)}`.trim()
+    await ctx.db.update(notes).set({ content: merged, updatedAt: now }).where(eq(notes.id, id)).run()
+    if (!noteBm25Index.upsert({ id, title: existing.title, content: merged })) noteBm25Index.invalidate()
+    return JSON.stringify({ ok: true, id, charCount: merged.length })
   },
 })
 

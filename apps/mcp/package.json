@@ -1,0 +1,25 @@
+{
+  "name": "@lumina/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.cjs",
+  "bin": {
+    "lumina-mcp": "dist/index.cjs"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "start": "node dist/index.cjs",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "tsup": "^8",
+    "typescript": "^5",
+    "vitest": "^5.0.1"
+  }
+}

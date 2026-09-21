@@ -10,6 +10,7 @@ import { getActiveProvider, embedTexts } from '../llm/provider.js'
 import { extractFileText, isSupportedFile, SUPPORTED_EXTS } from '../lib/fileLoaders.js'
 import { deleteNoteChunks } from '../lib/vectorstore.js'
 import { noteBm25Index } from '../lib/bm25Index.js'
+import { autoTagNote } from '../lib/autoTagger.js'
 import { indexNoteChunks } from './note.js'
 
 type Db = typeof import('../db/client.js').db
@@ -69,6 +70,11 @@ export async function doIngestFile(db: Db, absPath: string, skipDup: boolean): P
     })
     if (!noteBm25Index.upsert({ id: noteId, title: fileName, content: clean })) noteBm25Index.invalidate()
   }
+
+  // 自动标签：匹配已有标签名
+  try {
+    await autoTagNote(db, noteId, clean)
+  } catch { /* 标签失败不影响主流程 */ }
 
   const chunks = chunkText(clean)
   let embedded = 0

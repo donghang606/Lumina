@@ -63,6 +63,7 @@ export async function createLuminaAgent(ctx: Context, options: { unattended?: bo
       '- 直接创建笔记（create_note：需审批，仅在用户明确要求时用）\n' +
       '- 编辑笔记（edit_note 改标题/正文覆盖；append_note 追加内容；均需审批）\n' +
       '- 标签管理（list_tags / set_tags，写操作需审批）\n' +
+      '- 自动标签（auto_tag_note：扫描笔记内容匹配已有标签名，需审批）\n' +
       '- 知识图谱（get_graph）与查询视图（run_query_view）\n' +
       '- 图谱分析（find_orphan_notes 找孤岛笔记；suggest_connections 基于标签共现推荐连接）\n' +
       '- Wiki 模式（list_wiki_pages / get_wiki_page / create_wiki_page / update_wiki_page / delete_wiki_page / get_wiki_revisions / rollback_wiki_page；从笔记生成结构化 Wiki，自动保存版本历史，支持回滚）\n' +

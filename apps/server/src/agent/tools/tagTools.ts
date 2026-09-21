@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { eq } from 'drizzle-orm'
 import { tags, tagsOnNotes, notes } from '../../db/schema.js'
 import { registerTool } from '../registry.js'
+import { autoTagNote } from '../../lib/autoTagger.js'
 
 function slugify(name: string): string {
   const base = name.trim().toLowerCase().replace(/\s+/g, '-')
@@ -63,5 +64,26 @@ registerTool({
       await ctx.db.insert(tagsOnNotes).values(tagIds.map((tagId) => ({ noteId, tagId, assignedBy: 'manual' as const }))).run()
     }
     return JSON.stringify({ noteId, tags: names })
+  },
+})
+
+registerTool({
+  name: 'auto_tag_note',
+  description: '对指定笔记执行自动标签：扫描内容匹配已有标签名（不覆盖手动标签）。适合"给这篇笔记自动打标签"。',
+  schema: z.object({ noteId: z.string().describe('笔记 id') }),
+  meta: { requireApproval: true },
+  handler: async (args, ctx) => {
+    const noteId = String(args.noteId)
+    const note = await ctx.db.select().from(notes).where(eq(notes.id, noteId)).get()
+    if (!note) return JSON.stringify({ error: '笔记不存在' })
+    const added = await autoTagNote(ctx.db, noteId, note.content ?? '')
+    // 获取最终标签列表
+    const final = await ctx.db.select({ name: tags.name }).from(tagsOnNotes).innerJoin(tags, eq(tags.id, tagsOnNotes.tagId)).where(eq(tagsOnNotes.noteId, noteId)).all()
+    return JSON.stringify({
+      noteId,
+      autoAdded: added.length,
+      autoTagIds: added,
+      allTags: final.map((r: any) => r.name),
+    })
   },
 })

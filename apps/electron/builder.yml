@@ -6,6 +6,11 @@ directories:
 files:
   - dist/**/*
   - package.json
+publish:
+  provider: github
+  owner: donghang
+  repo: Lumina
+  releaseType: release
 extraResources:
   # server 以 tar 形式内嵌（extraFiles 被 electron-builder 过滤 node_modules，改首启解压到 userData）
   - from: staging/server-bundle.tar

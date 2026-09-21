@@ -14,7 +14,9 @@
     "package": "node scripts/dev.mjs --package"
   },
   "dependencies": {
-    "@lumina/server": "workspace:*"
+    "@lumina/server": "workspace:*",
+    "electron-log": "^5.4.4",
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
     "@types/node": "^24",

@@ -4,6 +4,7 @@ import net from 'node:net'
 import path from 'node:path'
 import fs from 'node:fs'
 import { migrateLegacyData } from './migrate.js'
+import { initUpdater } from './updater.js'
 
 declare const __dirname: string
 const isDev = process.env.LUMINA_ELECTRON_DEV === '1'
@@ -177,6 +178,11 @@ async function bootstrap() {
     createWindow(DEV_FRONTEND_URL)
   } else {
     createWindow(`http://127.0.0.1:${serverPort}/`)
+  }
+
+  // 生产模式启用自动更新
+  if (!isDev && mainWindow) {
+    initUpdater(mainWindow)
   }
 }
 

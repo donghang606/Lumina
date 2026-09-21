@@ -193,6 +193,16 @@ export async function initDb(c = client) {
     updated_at TEXT NOT NULL
   )`)
 
+  // WeKnora-inspired: Chunk 编辑版本历史
+  await sql.execute(`CREATE TABLE IF NOT EXISTS chunk_revisions (
+    id TEXT PRIMARY KEY,
+    block_id TEXT NOT NULL REFERENCES note_blocks(id) ON DELETE CASCADE,
+    chunk_content TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    edited_by TEXT NOT NULL DEFAULT 'user',
+    created_at TEXT NOT NULL
+  )`)
+
   await migrateLegacyApiKeys(sql)
 }
 

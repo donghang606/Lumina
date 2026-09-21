@@ -128,6 +128,16 @@ export const noteBlocks = sqliteTable('note_blocks', {
   tokenCount: integer('token_count').notNull().default(0),
 })
 
+// ── WeKnora-inspired: Chunk 编辑版本历史 ─────────────────────────
+export const chunkRevisions = sqliteTable('chunk_revisions', {
+  id: text('id').primaryKey(),
+  blockId: text('block_id').references(() => noteBlocks.id, { onDelete: 'cascade' }).notNull(),
+  chunkContent: text('chunk_content').notNull(),
+  version: integer('version').notNull(),
+  editedBy: text('edited_by').notNull().default('user'),
+  createdAt: text('created_at').notNull(),
+})
+
 /** 块级引用：从 source 笔记引用 target 笔记的某个块（note_blocks.id） */
 export const blockRefs = sqliteTable('block_refs', {
   id: text('id').primaryKey(),

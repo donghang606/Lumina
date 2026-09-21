@@ -19,6 +19,7 @@ import { ingestRouter } from './ingest.js'
 import { scheduleRouter } from './schedule.js'
 import { wikiRouter } from './wiki.js'
 import { memoryRouter } from './memory.js'
+import { chunkRouter } from './chunk.js'
 
 export const appRouter = router({
   note: noteRouter,
@@ -41,6 +42,7 @@ export const appRouter = router({
   schedule: scheduleRouter,
   wiki: wikiRouter,
   memory: memoryRouter,
+  chunk: chunkRouter,
 })
 
 export type AppRouter = typeof appRouter

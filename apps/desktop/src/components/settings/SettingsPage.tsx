@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Typography, Form, Input, Select, Switch, Button, Tabs, Table, Message, Space, Modal, Tag } from '@arco-design/web-react'
-import { Settings as SettingsIcon, Plus, Zap, Server, Palette, Sparkles, BrainCircuit, RefreshCw, Trash2, Database, Mic, Globe, TerminalSquare } from 'lucide-react'
+import { Settings as SettingsIcon, Plus, Zap, Server, Palette, Sparkles, BrainCircuit, RefreshCw, Trash2, Database, Mic, Globe, TerminalSquare, Brain } from 'lucide-react'
 import { configService } from '../../services/configService'
 import { aiService } from '../../services/aiService'
 import { noteService } from '../../services/noteService'
@@ -12,6 +12,7 @@ import { setServerUrl, getServerUrlRaw } from '../../lib/trpc'
 import { parseMarkdown, toMarkdown, sanitizeFilename } from '../../lib/markdown'
 import { useTheme } from '../../hooks/useTheme'
 import { Glass } from '../ui/primitives'
+import MemoryPanel from './MemoryPanel'
 import type { AiProvider, McpServer } from '@lumina/shared'
 
 const { Text } = Typography
@@ -884,6 +885,11 @@ export default function SettingsPage() {
                 ]}
               />
             )}
+          </Glass>
+        </Tabs.TabPane>
+        <Tabs.TabPane key="memory" title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Brain size={13} /> 长期记忆</span>}>
+          <Glass style={{ padding: 16 }}>
+            <MemoryPanel />
           </Glass>
         </Tabs.TabPane>
       </Tabs>

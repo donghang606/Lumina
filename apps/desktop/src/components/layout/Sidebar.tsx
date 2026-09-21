@@ -24,14 +24,14 @@ import { tagService } from '../../services/noteService'
 
 const { Text } = Typography
 
-const navItems: { key: NavKey; label: string; Icon: typeof LayoutDashboard }[] = [
-  { key: 'feed', label: '工作台', Icon: LayoutDashboard },
-  { key: 'notes', label: '笔记', Icon: StickyNote },
-  { key: 'graph', label: '图谱', Icon: Network },
-  { key: 'timeline', label: '时间线', Icon: History },
-  { key: 'schedule', label: '日程', Icon: Calendar },
-  { key: 'wiki', label: 'Wiki', Icon: BookOpen },
-  { key: 'settings', label: '设置', Icon: Settings },
+const navItems: { key: NavKey; label: string; Icon: typeof LayoutDashboard; shortcut?: string }[] = [
+  { key: 'feed', label: '工作台', Icon: LayoutDashboard, shortcut: '⌘1' },
+  { key: 'notes', label: '笔记', Icon: StickyNote, shortcut: '⌘2' },
+  { key: 'graph', label: '图谱', Icon: Network, shortcut: '⌘3' },
+  { key: 'timeline', label: '时间线', Icon: History, shortcut: '⌘4' },
+  { key: 'schedule', label: '日程', Icon: Calendar, shortcut: '⌘5' },
+  { key: 'wiki', label: 'Wiki', Icon: BookOpen, shortcut: '⌘6' },
+  { key: 'settings', label: '设置', Icon: Settings, shortcut: '⌘7' },
 ]
 
 export default function Sidebar() {
@@ -182,13 +182,14 @@ export default function Sidebar() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* 主导航 */}
       <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 'var(--sp-5)' }}>
-        {navItems.map(({ key, label, Icon }) => {
+        {navItems.map(({ key, label, Icon, shortcut }) => {
           const active = nav === key
           return (
             <button
               key={key}
               onClick={() => setNav(key)}
               className={active ? 'lumina-nav is-active' : 'lumina-nav'}
+              title={shortcut ? `${label} (${shortcut})` : label}
               style={{
                 background: active ? 'var(--accent-soft)' : 'transparent',
                 color: active ? 'var(--accent)' : 'var(--text-2)',
@@ -196,7 +197,10 @@ export default function Sidebar() {
               }}
             >
               <Icon size={15} strokeWidth={active ? 2.4 : 2} />
-              <span style={{ fontSize: 'var(--text-base)', fontWeight: active ? 600 : 500 }}>{label}</span>
+              <span style={{ fontSize: 'var(--text-base)', fontWeight: active ? 600 : 500, flex: 1 }}>{label}</span>
+              {shortcut && (
+                <span style={{ fontSize: 10, color: 'var(--text-4)', opacity: 0.6 }}>{shortcut}</span>
+              )}
             </button>
           )
         })}

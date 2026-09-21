@@ -11,6 +11,7 @@ import SchedulePage from './components/pages/SchedulePage'
 import WikiPage from './components/pages/WikiPage'
 import { useLayoutStore } from './stores/layoutStore'
 import { useTheme } from './hooks/useTheme'
+import { useGlobalHotkeys } from './hooks/useGlobalHotkeys'
 import UiButton from './components/ui/UiButton'
 
 function CurrentPage() {
@@ -27,6 +28,7 @@ function CurrentPage() {
 export default function App() {
   const { aiPanelOpen, setAIPanelOpen, toggleAIPanel } = useLayoutStore()
   useTheme()
+  useGlobalHotkeys()
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-app)', overflow: 'hidden' }}>
@@ -77,7 +79,7 @@ export default function App() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <UiButton variant={aiPanelOpen ? 'primary' : 'outline'} icon={Sparkles} onClick={() => toggleAIPanel()}>
+          <UiButton variant={aiPanelOpen ? 'primary' : 'outline'} icon={Sparkles} onClick={() => toggleAIPanel()} title="切换 AI 面板 (⌘K)">
             Lumina AI
           </UiButton>
         </div>

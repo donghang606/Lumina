@@ -17,6 +17,8 @@ import { harnessRouter } from './harness.js'
 import { agentRouter } from './agent.js'
 import { ingestRouter } from './ingest.js'
 import { scheduleRouter } from './schedule.js'
+import { wikiRouter } from './wiki.js'
+import { memoryRouter } from './memory.js'
 
 export const appRouter = router({
   note: noteRouter,
@@ -37,6 +39,8 @@ export const appRouter = router({
   agent: agentRouter,
   ingest: ingestRouter,
   schedule: scheduleRouter,
+  wiki: wikiRouter,
+  memory: memoryRouter,
 })
 
 export type AppRouter = typeof appRouter

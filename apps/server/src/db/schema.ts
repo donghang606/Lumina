@@ -201,3 +201,33 @@ export const scheduleEvents = sqliteTable('schedule_events', {
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 })
+
+// ── WeKnora-inspired: Wiki Mode ──────────────────────────────────
+export const wikiPages = sqliteTable('wiki_pages', {
+  id: text('id').primaryKey(),
+  title: text('title').notNull().default(''),
+  content: text('content').notNull().default(''),
+  sourceNoteIds: text('source_note_ids', { mode: 'json' }).$type<string[]>().default([]),
+  version: integer('version').notNull().default(1),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
+
+export const wikiRevisions = sqliteTable('wiki_revisions', {
+  id: text('id').primaryKey(),
+  pageId: text('page_id').references(() => wikiPages.id, { onDelete: 'cascade' }).notNull(),
+  title: text('title').notNull().default(''),
+  content: text('content').notNull().default(''),
+  version: integer('version').notNull(),
+  createdAt: text('created_at').notNull(),
+})
+
+// ── WeKnora-inspired: Cross-session Long-term Memory ─────────────
+export const userMemories = sqliteTable('user_memories', {
+  id: text('id').primaryKey(),
+  type: text('type', { enum: ['profile', 'preference', 'fact', 'task', 'interest'] }).notNull(),
+  content: text('content').notNull(),
+  source: text('source').notNull().default(''),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})

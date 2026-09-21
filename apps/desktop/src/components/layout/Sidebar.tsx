@@ -16,6 +16,7 @@ import {
   Ghost,
   History,
   Calendar,
+  BookOpen,
 } from 'lucide-react'
 import { useNoteStore } from '../../stores/noteStore'
 import { useLayoutStore, type NavKey } from '../../stores/layoutStore'
@@ -29,6 +30,7 @@ const navItems: { key: NavKey; label: string; Icon: typeof LayoutDashboard }[] =
   { key: 'graph', label: '图谱', Icon: Network },
   { key: 'timeline', label: '时间线', Icon: History },
   { key: 'schedule', label: '日程', Icon: Calendar },
+  { key: 'wiki', label: 'Wiki', Icon: BookOpen },
   { key: 'settings', label: '设置', Icon: Settings },
 ]
 

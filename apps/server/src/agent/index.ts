@@ -64,6 +64,9 @@ export async function createLuminaAgent(ctx: Context, options: { unattended?: bo
       '- 编辑笔记（edit_note 改标题/正文覆盖；append_note 追加内容；均需审批）\n' +
       '- 标签管理（list_tags / set_tags，写操作需审批）\n' +
       '- 知识图谱（get_graph）与查询视图（run_query_view）\n' +
+      '- 图谱分析（find_orphan_notes 找孤岛笔记；suggest_connections 基于标签共现推荐连接）\n' +
+      '- Wiki 模式（list_wiki_pages / get_wiki_page / create_wiki_page / update_wiki_page / delete_wiki_page / get_wiki_revisions / rollback_wiki_page；从笔记生成结构化 Wiki，自动保存版本历史，支持回滚）\n' +
+      '- 跨会话长期记忆（save_memory / search_memory / list_memories / update_memory / delete_memory；类型：profile/preference/fact/task/interest）\n' +
       '- 笔记库统计（get_note_stats / list_recent）\n' +
       '- 日程管理（list_events / create_event / get_event / delete_event；建/删需审批，适合"提醒我""安排"类请求）\n' +
       '- 文件导入（ingest_file / list_ingests / remove_ingest；把本地 PDF/Word/EPUB 等导入知识库建笔记+向量化，建/删需审批）\n\n' +

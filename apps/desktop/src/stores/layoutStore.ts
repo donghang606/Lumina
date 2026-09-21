@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type NavKey = 'feed' | 'notes' | 'graph' | 'timeline' | 'schedule' | 'settings'
+export type NavKey = 'feed' | 'notes' | 'graph' | 'timeline' | 'schedule' | 'wiki' | 'settings'
 export type AIMode = 'chat' | 'agent'
 
 interface LayoutState {

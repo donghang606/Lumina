@@ -163,6 +163,36 @@ export async function initDb(c = client) {
     updated_at TEXT NOT NULL
   )`)
 
+  // WeKnora-inspired: Wiki Mode
+  await sql.execute(`CREATE TABLE IF NOT EXISTS wiki_pages (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL DEFAULT '',
+    content TEXT NOT NULL DEFAULT '',
+    source_note_ids TEXT DEFAULT '[]',
+    version INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`)
+
+  await sql.execute(`CREATE TABLE IF NOT EXISTS wiki_revisions (
+    id TEXT PRIMARY KEY,
+    page_id TEXT NOT NULL REFERENCES wiki_pages(id) ON DELETE CASCADE,
+    title TEXT NOT NULL DEFAULT '',
+    content TEXT NOT NULL DEFAULT '',
+    version INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+  )`)
+
+  // WeKnora-inspired: Cross-session Long-term Memory
+  await sql.execute(`CREATE TABLE IF NOT EXISTS user_memories (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    content TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`)
+
   await migrateLegacyApiKeys(sql)
 }
 

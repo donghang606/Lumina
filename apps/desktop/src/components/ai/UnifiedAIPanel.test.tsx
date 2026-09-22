@@ -29,24 +29,24 @@ vi.mock('../../services/feedService', () => ({ graphService: { getGraphData: vi.
 describe('UnifiedAIPanel', () => {
   beforeEach(() => {
     vi.mocked(streamAgentChat).mockReset()
-    useLayoutStore.setState({ aiPanelOpen: true, aiMode: 'agent' })
+    useLayoutStore.setState({ aiPanelOpen: true })
   })
 
-  it('Agent 模式打开时显示空态与历史会话', async () => {
+  it('打开时显示空态与历史会话', async () => {
     render(<UnifiedAIPanel open onClose={() => {}} />)
     await waitFor(() => expect(screen.getAllByText('旧会话').length).toBeGreaterThan(0))
     expect(screen.getByText('Lumina AI')).toBeInTheDocument()
-    expect(screen.getByText(/我是 Lumina Agent/)).toBeInTheDocument()
+    expect(screen.getByText(/我是 Lumina AI/)).toBeInTheDocument()
   })
 
-  it('Agent 模式发送消息 → 流式工具事件 → 最终回复', async () => {
+  it('发送消息 → 流式工具事件 → 最终回复', async () => {
     vi.mocked(streamAgentChat).mockImplementation(async (_body, onEvent) => {
       onEvent?.({ type: 'tool-call', payload: { toolName: 'search_notes', toolCallId: 'tc1', arguments: { query: 'x' } } })
       onEvent?.({ type: 'tool-result', payload: { toolName: 'search_notes', toolCallId: 'tc1', output: '[]', status: 'success' } })
       return { conversationId: 'c-new', reply: '找到了 2 条', pendingApproval: null, threadId: 'th1' }
     })
     render(<UnifiedAIPanel open onClose={() => {}} />)
-    const textarea = screen.getByPlaceholderText(/让 Agent 帮你查笔记/)
+    const textarea = screen.getByPlaceholderText(/问我任何/)
     fireEvent.change(textarea, { target: { value: '帮我查笔记' } })
     fireEvent.keyDown(textarea, { key: 'Enter' })
     await waitFor(() => expect(screen.getByText('找到了 2 条')).toBeInTheDocument())
@@ -55,55 +55,34 @@ describe('UnifiedAIPanel', () => {
     expect(streamAgentChat).toHaveBeenCalledWith({ message: '帮我查笔记', conversationId: undefined }, expect.any(Function))
   })
 
-  it('Agent 模式 HITL 中断展示审批条，同意后走 resume', async () => {
+  it('HITL 中断展示审批条，同意后走 resume', async () => {
     vi.mocked(streamAgentChat)
       .mockImplementationOnce(async () => ({ conversationId: 'c1', reply: '', threadId: 'th-hitl', pendingApproval: [{ toolCallId: 't1', name: 'create_note', args: { title: '新笔记' } }] }))
       .mockImplementationOnce(async () => ({ conversationId: 'c1', reply: '已创建', pendingApproval: null, threadId: 'th-hitl' }))
     render(<UnifiedAIPanel open onClose={() => {}} />)
-    const textarea = screen.getByPlaceholderText(/让 Agent 帮你查笔记/)
+    const textarea = screen.getByPlaceholderText(/问我任何/)
     fireEvent.change(textarea, { target: { value: '建个笔记' } })
     fireEvent.keyDown(textarea, { key: 'Enter' })
-    await waitFor(() => expect(screen.getByText(/Agent 请求执行写操作/)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(/请求执行写操作/)).toBeInTheDocument())
     expect(screen.getByText(/"title": "新笔记"/)).toBeInTheDocument()
     fireEvent.click(screen.getByText('同意执行'))
     await waitFor(() => expect(screen.getByText('已创建')).toBeInTheDocument())
     expect(streamAgentChat).toHaveBeenLastCalledWith({ resume: { threadId: 'th-hitl', decision: 'approve' } }, expect.any(Function))
   })
 
-  it('Agent 模式流错误时展示错误消息', async () => {
+  it('流错误时展示错误消息', async () => {
     vi.mocked(streamAgentChat).mockRejectedValue(new Error('连接失败'))
     render(<UnifiedAIPanel open onClose={() => {}} />)
-    const textarea = screen.getByPlaceholderText(/让 Agent 帮你查笔记/)
+    const textarea = screen.getByPlaceholderText(/问我任何/)
     fireEvent.change(textarea, { target: { value: 'hi' } })
     fireEvent.keyDown(textarea, { key: 'Enter' })
     await waitFor(() => expect(screen.getByText(/⚠️ 连接失败/)).toBeInTheDocument())
   })
 
-  it('问答模式（chat）渲染 AI 视图', () => {
-    useLayoutStore.setState({ aiPanelOpen: true, aiMode: 'chat' })
+  it('聚合最近会话 chip 点击 → 加载会话', async () => {
     render(<UnifiedAIPanel open onClose={() => {}} />)
-    expect(screen.getByText('Lumina AI')).toBeInTheDocument()
-    // 问答 tab 高亮（有「问答」文案 + 知识图谱区）
-    expect(screen.getByText('知识卡片图谱')).toBeInTheDocument()
-  })
-
-  it('tab 切换：问答 ↔ Agent', () => {
-    useLayoutStore.setState({ aiPanelOpen: true, aiMode: 'chat' })
-    render(<UnifiedAIPanel open onClose={() => {}} />)
-    expect(screen.getByText('知识卡片图谱')).toBeInTheDocument()
-    fireEvent.click(screen.getByText('Agent'))
-    expect(screen.getByText(/我是 Lumina Agent/)).toBeInTheDocument()
-  })
-
-  it('聚合最近会话 chip 点击 → 切 Agent tab + 加载会话', async () => {
-    useLayoutStore.setState({ aiPanelOpen: true, aiMode: 'chat' })
-    render(<UnifiedAIPanel open onClose={() => {}} />)
-    // 等聚合 chip 渲染（agentService.listConversations 返回 '旧会话'）
     const chip = await waitFor(() => screen.getAllByText('旧会话')[0])
     fireEvent.click(chip)
-    // 切到 Agent tab 后输入框 placeholder 是 Agent 的
-    await waitFor(() => expect(screen.getByPlaceholderText(/让 Agent 帮你查笔记/)).toBeInTheDocument())
-    // AgentChatView 收到 loadSignal → 调用 getConversation（已 mock 返回 messages）
     expect(agentService.getConversation).toHaveBeenCalledWith('c1')
   })
 })

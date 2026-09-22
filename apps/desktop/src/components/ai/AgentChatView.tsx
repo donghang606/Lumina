@@ -14,7 +14,7 @@ interface ChatMessage {
 
 export interface LoadSignal { id: string; nonce: number }
 
-/** Agent 视图：deepagents 工具调用流 + HITL 审批（融合面板内嵌） */
+/** 单一 AI 视图：RAG 检索 + 工具调用 + HITL 审批（融合面板内嵌） */
 export default function AgentChatView({ loadSignal }: { loadSignal?: LoadSignal | null }) {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -173,7 +173,7 @@ export default function AgentChatView({ loadSignal }: { loadSignal?: LoadSignal 
         {messages.length === 0 && !loading && (
           <div style={{ textAlign: 'center', padding: 'var(--sp-6) 0', color: 'var(--text-3)' }}>
             <div style={{ fontSize: 'var(--text-sm)', lineHeight: 1.7 }}>
-              我是 Lumina Agent——可以检索笔记、分析图谱、建议记笔记。<br />需要写库的操作会先请你确认。
+              我是 Lumina AI——可以检索笔记、分析图谱、建议记笔记。<br />需要写库的操作会先请你确认。
             </div>
           </div>
         )}
@@ -198,7 +198,7 @@ export default function AgentChatView({ loadSignal }: { loadSignal?: LoadSignal 
       {/* 输入 */}
       <div style={{ padding: '12px 16px', borderTop: '1px solid var(--glass-border)' }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-          <textarea ref={inputRef} placeholder={approval ? '等待审批…' : '让 Agent 帮你查笔记、建卡片…'} value={input} onChange={(e) => setInput(e.target.value)}
+          <textarea ref={inputRef} placeholder={approval ? '等待审批…' : '问我任何关于笔记的问题…'} value={input} onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send() } }}
             disabled={loading || !!approval} rows={2}
             style={{ flex: 1, resize: 'none', background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-md)', padding: '8px 12px', fontSize: 'var(--text-md)', color: 'var(--text-1)', outline: 'none', fontFamily: 'inherit' }}

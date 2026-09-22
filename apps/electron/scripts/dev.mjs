@@ -34,7 +34,7 @@ async function dev() {
     console.log('[dev] building electron main/preload...')
     pnpm(['--filter', '@lumina/electron', 'build'])
   }
-  const distMain = path.join(root, 'apps/electron/dist/main.js')
+  const distMain = path.join(root, 'apps/electron/dist/main.cjs')
   if (!existsSync(distMain)) throw new Error('electron dist missing, run: pnpm --filter @lumina/electron build')
 
   console.log('[dev] starting vite...')
